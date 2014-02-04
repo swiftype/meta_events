@@ -12,7 +12,13 @@ describe ::MetaEvents::Definition::Version do
   it "should require valid parameters for construction" do
     expect { klass.new(double("not-a-definition-set"), 1, "2014-01-01") }.to raise_error(ArgumentError)
     expect { klass.new(definition_set, "foo", "2014-01-01") }.to raise_error(ArgumentError)
-    expect { klass.new(definition_set, 1, "foo") }.to raise_error(ArgumentError)
+
+    # Ruby 1.8.x's Time.parse method will accept "foo" for Time.parse and just return Time.now --
+    # which is deeply unfortunate, but there's really no good way around it.
+    unless RUBY_VERSION =~ /^1\.8\./
+      expect { klass.new(definition_set, 1, "foo") }.to raise_error(ArgumentError)
+    end
+
     expect { klass.new(definition_set, 1, nil) }.to raise_error
     expect { klass.new(definition_set, 1, "2014-01-01", :foo => :bar) }.to raise_error(ArgumentError, /foo/i)
   end

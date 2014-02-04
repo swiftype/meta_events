@@ -23,7 +23,12 @@ describe ::MetaEvents::Definition::Category do
     expect { klass.new(double("whatever"), :foo) }.to raise_error(ArgumentError)
     expect { klass.new(version, nil) }.to raise_error(ArgumentError)
     expect { klass.new(version, :foo, :bar => :baz) }.to raise_error(ArgumentError, /bar/i)
-    expect { klass.new(version, :foo, :retired_at => "foo") }.to raise_error(ArgumentError)
+
+    # Ruby 1.8.x's Time.parse method will accept "foo" for Time.parse and just return Time.now --
+    # which is deeply unfortunate, but there's really no good way around it.
+    unless RUBY_VERSION =~ /^1\.8\./
+      expect { klass.new(version, :foo, :retired_at => "foo") }.to raise_error(ArgumentError)
+    end
   end
 
   it "should run its block in its own context" do
