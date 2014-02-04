@@ -131,13 +131,177 @@ Now, when you fire an event, you should get output like this in your Rails log:
 
 ...and, if you have configured Mixpanel properly, it will have been sent to Mixpanel, too!
 
-# Making It Better
+# The Real Power of MetaEvents
+
+Now that we've gotten the basics out of the way, we can start using the real power of MetaEvents.
 
 ### Adding Implicit Properties
 
-### Factoring Out Object Properties
+Very often, just by being in some particular part of code, you already know a fair amount of data that you want to
+pass as events. For example, if you're inside a Rails controller action, and you have a current user, you're probably
+going to want to pass properties about that user to any event that happens in the controller action.
+
+You could add these to every single call to `#event!`, but MetaEvents has a better way. When you create the
+`MetaEvents::Tracker` instance, you can define _implicit properties_. Let's add some now:
+
+    class ApplicationController < ActionController::Base
+      ...
+      def event_tracker
+        implicit_properties = { }
+        if current_user
+          implicit_properties.merge!(
+            :user_gender => current_user.gender,
+            :user_age => current_user.age
+          )
+        end
+        @event_tracker ||= MetaEvents::Tracker.new(:implicit_properties => implicit_properties)
+      end
+      ...
+    end
+
+Now, these properties will get passed on every event fired by this Tracker. (This is, in fact, the biggest
+consideration when deciding when and where you'll create new `MetaEvents::Tracker` instances: implicit properties are
+extremely useful, so you'll want the lifecycle of a Tracker to match closely the lifecycle of something in your
+application that has implicit properties.)
+
+### Multi-Object Events
+
+We're also going to face another problem: many events involve multiple underlying objects, each of which has many
+properties that are defined on it. For example, imagine we have an event triggered when a user sends a message to
+another user. We have at least three entities: the 'from' user, the 'to' user, and the message itself. If we really
+want to instrument this event properly, we're going to want something like this:
+
+    event_tracker.event!(:user, :sent_message, {
+      :from_user_country => from_user.country,
+      :from_user_state => from_user.state,
+      :from_user_postcode => from_user.postcode,
+      :from_user_city => from_user.city,
+      :from_user_language => from_user.language,
+      :from_user_referred_from => from_user.referred_from,
+      :from_user_gender => from_user.gender,
+      :from_user_age => from_user.age,
+
+      :to_user_country => to_user.country,
+      :to_user_state => to_user.state,
+      :to_user_postcode => to_user.postcode,
+      :to_user_city => to_user.city,
+      :to_user_language => to_user.language,
+      :to_user_referred_from => to_user.referred_from,
+      :to_user_gender => to_user.gender,
+      :to_user_age => to_user.age,
+
+      :message_sent_at => message.sent_at,
+      :message_type => message.type,
+      :message_length => message.length,
+      :message_language => message.language,
+      :message_attachments => message.attachments?
+      })
+
+Needless to say, this kind of sucks. Either we're going to end up with a ton of duplicate, unmaintainable code, or
+we'll just cut back and only pass a few properties &mdash; greatly reducing the possibilities of our analytics
+system.
+
+### Using Hashes to Factor Out Naming
+
+We can improve this situation by using a feature of MetaEvents: when properties are nested in sub-hashes, they get
+automatically expanded and their names prefixed by the outer hash key. So let's define a couple of methods on models:
+
+    class User < ActiveRecord::Base
+      def to_event_properties
+        {
+          :country => country,
+          :state => state,
+          :postcode => postcode,
+          :city => city,
+          :language => language,
+          :referred_from => referred_from,
+          :gender => gender,
+          :age => age
+        }
+      end
+    end
+
+    class Message < ActiveRecord::Base
+      def to_event_properties
+        {
+          :sent_at => sent_at,
+          :type => type,
+          :length => length,
+          :language => language,
+          :attachments => attachments?
+        }
+      end
+    end
+
+Now, we can pass the exact same set of properties as the above example, by simply doing:
+
+    event_tracker.event!(:user, :sent_message, {
+      :from_user => from_user.to_event_properties,
+      :to_user => to_user.to_event_properties,
+      :message => message.to_event_properties
+      })
+
+**SO** much better.
+
+### Moving Hash Generation To Objects
+
+And &mdash; tah-dah! &mdash; MetaEvents supports this syntax automatically. If you pass an object as a property, and
+that object defines a method called `#to_event_properties`, then it will be called automatically, and replaced.
+Our code now looks like:
+
+    event_tracker.event!(:user, :sent_message, { :from_user => from_user, :to_user => to_user, :message => message })
+
+### How to Take the Most Advantage
+
+To make the most use of MetaEvents, define `#to_event_properties` very liberally on objects in your system, make them
+return any properties you even think might be useful, and pass them to events. MetaEvents will expand them for you,
+allowing large numbers of properties on events, which allows Mixpanel and other such systems to be of the most use
+to you.
+
+# Miscellaneous and Trivia
+
+A few things before we're done:
 
 ### Retiring an Event
+
+Often you'll have events that you _retire_ &mdash; they were used in the past, but no longer. You could just delete
+them from your MetaEvents DSL file, but this will mean the historical record is suddenly gone. (Well, there's source
+control, but that's a pain.)
+
+Rather than doing this, you can retire them:
+
+    global_events_prefix :ab
+
+    version 1, "2014-02-04" do
+      category :user do
+        event :logged_in_with_facebook, "2014-02-04", "user creates a brand-new account", :retired_at => "2014-06-01"
+        event :signed_up, "2014-02-04", "user creates a brand-new account"
+      end
+    end
+
+Given the above, trying to call `event!(:user, :logged_in_with_facebook)` will fail with an exception, because the
+event has been retired. (Note that, once again, the actual date passed to `:retired_at` is simply for record-keeping
+purposes; the exception is generated if `:retired_at` is set to _anything_.)
+
+You can retire events, categories, and entire versions; this system ensures the DSL continues to be a historical record
+of what things were in the past, as well as what they are today.
+
+### Adding Notes to Events
+
+You can also add notes to events. They must be tagged with the author and the time, and they can be very useful for
+documenting changes:
+
+    global_events_prefix :ab
+
+    version 1, "2014-02-04" do
+      category :user do
+        event :signed_up, "2014-02-04", "user creates a brand-new account" do
+          note "2014-03-17", "jsmith", "Moved sign-up button to the home page -- should increase signups significantly"
+        end
+      end
+    end
+
+This allows you to record changes to events, as well as the events themselves.
 
 ### Documenting Events
 
@@ -148,13 +312,30 @@ introspection, and could easily be extended to, _e.g._, generate HTML fully docu
 
 Patches are welcome. ;-)
 
-### Adding Comments to Events
-
 ### Adding a New Version
+
+What is this top-level `version` in the DSL? Well, every once in a while, you will want to completely redo your set of
+events &mdash; perhaps you've learned a lot about using your analytics system, and realize you want them configured
+in a different way.
+
+When you want to do this, define a new top-level `version` in your DSL, and pass `:version => 2` (or whatever number
+you gave the new version) when creating your `MetaEvents::Tracker`. The tracker will look under that version for
+categories and events, and completely ignore other versions; your events will be called things like `ab2_user_signup`
+instead of `ab1_user_signup`, and so on. The old version can still stay present in your DSL for documentation and
+historical purposes.
+
+When you're completely done with the old version, retire it &mdash; `version 1, :retired_at => '2014-06-01' do ...`.
+
+Often, you'll want to run two versions simultaneously, because you want to have a transition period where you fire
+_both_ sets of events &mdash; this is hugely helpful in figuring out how your old events map to new events and
+when adjusting bases for the new events. (If you simply flash-cut from an old version to a new one on a single day,
+it is difficult or impossible to know if true underlying usage, etc., _actually_ changed, or if it's just an artifact
+of changing events.) You can simply create two `MetaEvents::Tracker` instances, one for each version, and use them
+in parallel.
 
 ## Contributing
 
-1. Fork it ( http://github.com/<my-github-username>/meta_events/fork )
+1. Fork it ( http://github.com/swiftype/meta_events/fork )
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
