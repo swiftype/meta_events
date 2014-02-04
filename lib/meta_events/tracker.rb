@@ -221,6 +221,8 @@ module MetaEvents
     # passed a separate definitions file using <tt>:definitions =></tt> in the constructor). You can set this to
     # the pathname of a file containing event definitions, an +IO+ object containing the text of event definitions, or
     # an ::MetaEvents::Definition::DefinitionSet object that you create any way you want.
+    #
+    # Reading +default_definitions+ always will return an instance of ::MetaEvents::Definition::DefinitionSet.
     class << self
       def default_definitions=(source)
         @default_definitions = ::MetaEvents::Definition::DefinitionSet.from(source)
@@ -237,6 +239,12 @@ module MetaEvents
     # The set of event receivers that this MetaEvents::Tracker instance will use. This should always be an Array (although
     # it can be empty if you don't want to send events anywhere).
     attr_accessor :event_receivers
+
+    # The ::MetaEvents::Definitions::DefinitionSet that this Tracker is using.
+    attr_reader :definitions
+
+    # The version of events that this Tracker is using.
+    attr_reader :version
 
     # Creates a new instance. +options+ can contain:
     #
@@ -262,7 +270,9 @@ module MetaEvents
       unless definitions
         raise ArgumentError, "We have no event definitions to use. You must either set event definitions for " +
 "all event trackers using #{self.class.name}.default_definitions = (DefinitionSet or file), " +
-"or pass them to this constructor using :definitions."
+"or pass them to this constructor using :definitions." +
+"If you're using Rails, you can also simply put your definitions in the file " +
+"config/meta_events.rb, and they will be automatically loaded."
       end
 
       @definitions = ::MetaEvents::Definition::DefinitionSet.from(definitions)
@@ -286,14 +296,15 @@ module MetaEvents
       properties = net_properties(additional_properties)
       event.validate!(properties)
 
+      name = event.full_name
+      properties = properties.stringify_keys
+
       self.event_receivers.each do |receiver|
-        receiver.track(event.full_name, properties.stringify_keys)
+        receiver.track(name, properties)
       end
     end
 
     private
-    attr_reader :definitions, :version
-
     # When we're expanding Hashes, we don't want to get into infinite recursion if you accidentally create a circular
     # reference. Rather than adding code to actually detect true circular references, we simply refuse to expand
     # Hashes beyond this many layers deep.
