@@ -134,6 +134,67 @@ Now, when you fire an event, you should get output like this in your Rails log:
 
 ...and, if you have configured Mixpanel properly, it will have been sent to Mixpanel, too!
 
+### Firing Front-End Events
+
+Generally speaking, firing events from the back end (your application server talking to Mixpanel or some other service
+directly) is more reliable, while firing events from the front end (JavaScript in your users' browsers talking to
+Mixpanel or some other service) is more scalable &mdash; so you may wish to fire events from the front end, too.
+Further, there are certain events (scrolling, JavaScript manipulation in the browser, and so on) that simply don't
+exist on the back end and can't be tracked from there &mdash; at least, not without adding calls back to your server
+from the front-end JavaScript.
+
+Fortunately, MetaEvents provides a tool to make this process very easy &mdash; the `#effective_properties` method,
+which returns everything you need to fire an event. Let's use Mixpanel's built-in
+[`track_links`](https://mixpanel.com/docs/integration-libraries/javascript-full-api#track_links) method from their
+JavaScript API to track some links, using MetaEvents:
+
+    # in app/helpers/application_helper.rb:
+    module ApplicationHelper
+      ...
+      def track_links(css_selector, event_category, event_name, additional_properties)
+        event_data = @event_tracker.effective_properties(event_category, event_name, additional_properties)
+        net_properties = event_data[:properties].merge('distinct_id' => event_data[:distinct_id])
+        "mixpanel.track_links(#{css_selector.to_json}, #{event_data[:event_name].to_json}, #{net_properties.to_json})".html_safe
+      end
+      ...
+    end
+
+    # in our view:
+    <a href="http://www.google.com" id="#bailed_out_to_google">Bail out to Google</a>
+    ...
+    <script type="text/javascript">
+      <%= track_links("#bailed_out_to_google", :user, :bailed_out_to_google, :game => @game) %>
+    </script>
+
+This small snippet of code can result in the following call to Mixpanel, nicely populated with lots and lots of
+properties (and correctly validated against your MetaEvents DSL):
+
+    mixpanel.track_links("#bailed_out_to_google", "ab1_user_bailed_out_to_google", {
+        user_first_name: "Jack",
+        user_last_name: "Johnson",
+        user_age: 27,
+        user_gender: true,
+        user_country: "US",
+        user_language: "en_US",
+        user_source: "Bing",
+        game_name: "Scrabble",
+        game_level: 7,
+        game_experience: 13,
+        ...
+      })
+
+(Here, we are passing the `distinct_id` explicitly inside the properties. You could also embed a call to
+`Mixpanel.identify(#{@event_tracker.distinct_id.to_json})` in the page separately, or otherwise manage the distinct
+ID any way you want.)
+
+**IMPORTANT**: In case it isn't obvious, realize that, once you start doing this,
+_all properties you include in front-end events are potentially visible to your users_ &mdash; and, in particular, you
+need to be careful of any `#to_event_properties` methods you write. No matter how you store the data in the browser,
+the user can simply watch the requests being fired from their browser to Mixpanel (or whatever other events provider
+you use) and see what you're passing. This is no different than the situation would be without MetaEvents, but, because
+MetaEvents makes it so easy to add large amounts of properties (which is a good thing!), you should take extra care
+here.
+
 ### More About Distinct IDs
 
 We glossed over the discussion of the distinct ID above. In short, it is a unique identifier (of no particular format;

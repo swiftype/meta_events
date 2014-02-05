@@ -312,18 +312,19 @@ module MetaEvents
       self.event_receivers = Array(options[:event_receivers] || self.class.default_event_receivers.dup)
     end
 
-    # Assigns a new distinct ID to this Tracker. Ordinarily, you will pass a distinct ID in the constructor; however,
-    # in certain cases, you will only have access to the distinct ID later, and this allows for that use case. (For
+    # In certain cases, you will only have access to the distinct ID later, and this allows for that use case. (For
     # example, if you create the Tracker in your Rails application's ApplicationController, then, when you process the
     # login action for your application, there will be no distinct ID when the Tracker is created -- because the user
     # does not have the proper cookie set yet -- but you'll discover the distinct ID in the middle of the action.)
-    def distinct_id=(new_distinct_id)
-      # merge_properties fails if there's a property collision -- but we still want to call it so that it validates
-      # whatever value we have. So we do it this way.
-      new_distinct_id_hash = { }
-      self.class.merge_properties(new_distinct_id_hash, { :distinct_id => new_distinct_id })
-      @implicit_properties.merge!(new_distinct_id_hash)
+    def distinct_id=(new_value)
+      new_distinct_id = self.class.normalize_scalar_property_value(new_value)
+      if new_distinct_id == :invalid_property_value
+        raise ArgumentError, "This is not an acceptable value for a distinct ID: #{new_distinct_id.inspect}"
+      end
+      @distinct_id = new_distinct_id
     end
+
+    attr_reader :distinct_id
 
     # Fires an event. +category_name+ must be the name of a category in the MetaEvents DSL (within the version that this
     # Tracker is using -- which is 1 if you haven't changed it); +event_name+ must be the name
@@ -363,11 +364,11 @@ module MetaEvents
       properties = @implicit_properties.merge(explicit)
 
       event.validate!(properties)
-
-      distinct_id = properties.delete('distinct_id')
+      # We need to do this instead of just using || so that you can override a present distinct_id with nil.
+      net_distinct_id = if properties.has_key?('distinct_id') then properties.delete('distinct_id') else self.distinct_id end
 
       {
-        :distinct_id => distinct_id,
+        :distinct_id => net_distinct_id,
         :event_name  => event.full_name,
         :properties  => properties
       }
@@ -428,20 +429,32 @@ module MetaEvents
   one present.}
           end
 
-          case value
-          when Numeric, true, false, nil then target[prefixed_key] = value
-          when String then target[prefixed_key] = value.strip
-          when Symbol then target[prefixed_key] = value.to_s.strip
-          when Time then target[prefixed_key] = value
-          when Hash then merge_properties(target, value, "#{prefixed_key}_", depth + 1)
-          else
-            if value.respond_to?(:to_event_properties)
+          net_value = normalize_scalar_property_value(value)
+          if net_value == :invalid_property_value
+            if value.kind_of?(Hash)
+              merge_properties(target, value, "#{prefixed_key}_", depth + 1)
+            elsif value.respond_to?(:to_event_properties)
               merge_properties(target, value.to_event_properties, "#{prefixed_key}_", depth + 1)
             else
               raise ArgumentError, "Event property #{prefixed_key.inspect} is not a valid scalar, Hash, or object that " +
                 "responds to #to_event_properties, but rather #{value.inspect}."
             end
+          else
+            target[prefixed_key] = net_value
           end
+        end
+      end
+
+      # Given a potential scalar value for a property, either returns the value that should actually be set in the
+      # resulting set of properties (for example, converting Symbols to Strings) or returns +:invalid_property_value+
+      # if that isn't a valid scalar value for a property.
+      def normalize_scalar_property_value(value)
+        case value
+        when Numeric, true, false, nil then value
+        when String then value.strip
+        when Symbol then value.to_s.strip
+        when Time then value
+        else :invalid_property_value
         end
       end
     end

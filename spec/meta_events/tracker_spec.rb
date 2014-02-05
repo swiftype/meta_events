@@ -111,19 +111,34 @@ EOS
     end
   end
 
-  describe "#distinct_id=" do
+  describe "#distinct_id" do
+    it "should allow reading the distinct ID" do
+      expect(@instance.distinct_id).to eq(@distinct_id)
+    end
+
     it "should allow changing the distinct ID at runtime" do
       i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
       expect_event('xy1_foo_bar', { }, :distinct_id => @distinct_id)
       i.distinct_id = '12345yoyoyo'
+      expect(i.distinct_id).to eq('12345yoyoyo')
       i.event!(:foo, :bar, { })
       expect_event('xy1_foo_bar', { }, :distinct_id => '12345yoyoyo')
+    end
+
+    it "should allow changing the distinct ID to nil at runtime" do
+      i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
+      expect(i.distinct_id).to eq(@distinct_id)
+      i.distinct_id = nil
+      expect(i.distinct_id).to eq(nil)
+      i.event!(:foo, :bar, { })
+      expect_event('xy1_foo_bar', { }, :distinct_id => nil)
     end
 
     it "should not allow setting the distinct ID to an unsupported object" do
       i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
       expect { i.distinct_id = /foobar/ }.to raise_error(ArgumentError)
+      expect(i.distinct_id).to eq(@distinct_id)
     end
   end
 
@@ -311,7 +326,7 @@ EOS
   describe "#merge_properties" do
     def expand(hash)
       out = { }
-      ::MetaEvents::Tracker.merge_properties(out, hash, "", 0)
+      klass.merge_properties(out, hash, "", 0)
       out
     end
 
@@ -363,6 +378,27 @@ EOS
 
     it "should raise if it detects a property-name conflict" do
       expect { expand(:foo_bar => :quux1, :foo => { :bar => :quux }) }.to raise_error(MetaEvents::Tracker::PropertyCollisionError)
+    end
+  end
+
+  describe "#normalize_scalar_property_value" do
+    it "should return the correct results for scalars" do
+      t = Time.now
+      {
+        nil => nil,
+        true => true,
+        false => false,
+        3 => 3,
+        42.5e+17 => 42.5e+17,
+        :foobar => 'foobar',
+        :' FooBar  ' => 'FooBar',
+        ' FooBar  ' => 'FooBar',
+        t => t,
+        /foobar/ => :invalid_property_value,
+        Object.new => :invalid_property_value
+      }.each do |input, output|
+        expect(klass.normalize_scalar_property_value(input)).to eq(output)
+      end
     end
   end
 end
