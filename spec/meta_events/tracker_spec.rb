@@ -276,14 +276,42 @@ EOS
     end
   end
 
-  describe "#merge_properties" do
-    before :each do
-      @instance = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
+  describe "#effective_properties" do
+    it "should validate the event" do
+      expect { @instance.effective_properties(:foo, :whatever) }.to raise_error(ArgumentError)
+      expect { @instance.effective_properties(:foo, :nolonger) }.to raise_error(::MetaEvents::Definition::DefinitionSet::RetiredEventError)
     end
 
+    it "should include the fully-qualified event name" do
+      expect(@instance.effective_properties(:foo, :bar)[:event_name]).to eq('xy1_foo_bar')
+    end
+
+    it "should include the distinct ID" do
+      expect(@instance.effective_properties(:foo, :bar)[:distinct_id]).to eq(@distinct_id)
+    end
+
+    it "should include a distinct ID of nil if there is none" do
+      i = new_instance(nil, :definitions => definition_set, :version => 1)
+      h = i.effective_properties(:foo, :bar)
+      expect(h.has_key?(:distinct_id)).to be_true
+      expect(h[:distinct_id]).to be_nil
+    end
+
+    it "should include the set of implicit and explicit properties" do
+      expect(@instance.effective_properties(:foo, :bar)[:properties]).to eq('user_name' => 'wilfred', 'user_hometown' => 'Fridley')
+      props = @instance.effective_properties(:foo, :bar, :baz => { :a => 1, :b => 'hoo' }, :user_name => 'bongo')[:properties]
+      expect(props).to eq('user_name' => 'bongo', 'user_hometown' => 'Fridley', 'baz_a' => 1, 'baz_b' => 'hoo')
+    end
+
+    it "should include no additional keys" do
+      expect(@instance.effective_properties(:foo, :bar).keys.sort_by(&:to_s)).to eq(%w{distinct_id event_name properties}.map(&:to_sym).sort_by(&:to_s))
+    end
+  end
+
+  describe "#merge_properties" do
     def expand(hash)
       out = { }
-      @instance.send(:merge_properties, out, hash, "", 0)
+      ::MetaEvents::Tracker.merge_properties(out, hash, "", 0)
       out
     end
 

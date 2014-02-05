@@ -306,7 +306,7 @@ module MetaEvents
       @version = options[:version] || self.class.default_version || raise(ArgumentError, "Must specify a :version")
 
       @implicit_properties = { }
-      merge_properties(@implicit_properties, options[:implicit_properties] || { })
+      self.class.merge_properties(@implicit_properties, options[:implicit_properties] || { })
       self.distinct_id = distinct_id if distinct_id
 
       self.event_receivers = Array(options[:event_receivers] || self.class.default_event_receivers.dup)
@@ -321,7 +321,7 @@ module MetaEvents
       # merge_properties fails if there's a property collision -- but we still want to call it so that it validates
       # whatever value we have. So we do it this way.
       new_distinct_id_hash = { }
-      merge_properties(new_distinct_id_hash, { :distinct_id => new_distinct_id })
+      self.class.merge_properties(new_distinct_id_hash, { :distinct_id => new_distinct_id })
       @implicit_properties.merge!(new_distinct_id_hash)
     end
 
@@ -333,26 +333,44 @@ module MetaEvents
     # +additional_properties+ can use the sub-hash and object syntax discussed, above, under the introduction to this
     # class.
     def event!(category_name, event_name, additional_properties = { })
-      event = version_object.fetch_event(category_name, event_name)
-      properties = net_properties(additional_properties)
-      event.validate!(properties)
-
-      name = event.full_name
-      distinct_id = properties.delete('distinct_id')
+      event_data = effective_properties(category_name, event_name, additional_properties)
 
       self.event_receivers.each do |receiver|
-        receiver.track(distinct_id, name, properties)
+        receiver.track(event_data[:distinct_id], event_data[:event_name], event_data[:properties])
       end
     end
 
-    class << self
-      def effective_properties(properties)
-
-      end
-    end
-
+    # Given a category, an event, and (optionally) additional properties, performs all of the expansion and validation
+    # of #event!, but does not actually fire the event -- rather, returns a Hash containing:
+    #
+    # [:distinct_id] The +distinct_id+ that should be passed with the event; this can be +nil+ if there is no distinct
+    #                ID being passed.
+    # [:event_name]  The fully-qualified event name, including +global_events_prefix+ and version number, exactly as
+    #                it should be passed to an events backend.
+    # [:properties]  The full set of properties, expanded (so values will only be scalars, never Hashes or objects),
+    #                with String keys, exactly as they should be passed to an events system.
+    #
+    # This method can be used for many things, but its primary purpose is to support front-end (Javascript-fired)
+    # events: you can have it compute exactly the set of properties that should be attached to such events, embed
+    # them into the page (using HTML +data+ attributes, JavaScript literals, or any other storage mechanism you want),
+    # and then have the front-end fire them. This allows consistency between front-end and back-end events, and is
+    # another big advantage of MetaEvents.
     def effective_properties(category_name, event_name, additional_properties = { })
+      event = version_object.fetch_event(category_name, event_name)
 
+      explicit = { }
+      self.class.merge_properties(explicit, additional_properties)
+      properties = @implicit_properties.merge(explicit)
+
+      event.validate!(properties)
+
+      distinct_id = properties.delete('distinct_id')
+
+      {
+        :distinct_id => distinct_id,
+        :event_name  => event.full_name,
+        :properties  => properties
+      }
     end
 
     private
@@ -366,70 +384,63 @@ module MetaEvents
       @definitions.fetch_version(version)
     end
 
-    # Computes the net set of properties for an event. This is the set of implicit properties for this Tracker,
-    # overlaid with the explicit properties passed in for that event.
-    def net_properties(new_properties)
-      explicit = { }
-      merge_properties(explicit, new_properties)
-
-      @implicit_properties.merge(explicit)
-    end
-
-    # Given a target Hash of properties in +target+, and a source Hash of properties in +source+, merges all properties
-    # in +source+ into +target+, obeying our hash-expansion rules (as specified in the introduction to this class).
-    # All new properties are added with their keys as Strings, and values must be:
-    #
-    # * A scalar of type Numeric (integer and floating-point numbers are both accepted), true, false, or nil;
-    # * A String or Symbol (and Symbols are converted to Strings before being used);
-    # * A Time;
-    # * A Hash, which will be recursively added using its key, plus an underscore, as the prefix
-    #   (that is, <tt>{ :foo => { :bar => :baz }}</tt> will become <tt>{ 'foo_bar' => 'baz' }</tt>);
-    # * An object that responds to <tt>#to_event_properties</tt>, which must in turn return a Hash; #to_event_properties
-    #   will be called, and it will then be treated exactly like a Hash, above.
-    #
-    # +prefix+ and +depth+ are only used for internal recursive calls:
-    #
-    # +prefix+ is a prefix that should be applied to all keys in the +source+ Hash before merging them into the +target+
-    # Hash. (Nothing is added to this prefix first, so, if you want an underscore separating it from the key, include
-    # the underscore in the +prefix+.)
-    #
-    # +depth+ should be an integer, indicating how many layers of recursive calls we've invoked; this is simply to
-    # prevent infinite recursion -- if this exceeds +MAX_DEPTH+, above, then an exception will be raised.
-    def merge_properties(target, source, prefix = nil, depth = 0)
-      if depth > MAX_DEPTH
-        raise "Nesting in EventTracker is too great; do you have a circular reference? " +
-          "We reached depth: #{depth.inspect}; expanding: #{source.inspect} with prefix #{prefix.inspect} into #{target.inspect}"
-      end
-
-      unless source.kind_of?(Hash)
-        raise ArgumentError, "You must supply a Hash for properties at #{prefix.inspect}; you supplied: #{source.inspect}"
-      end
-
-      source.each do |key, value|
-        prefixed_key = "#{prefix}#{key}"
-
-        if target.has_key?(prefixed_key)
-          raise PropertyCollisionError, %{Because of hash delegation, multiple properties with the key #{prefixed_key.inspect} are
-present. This can happen, for example, if you do this:
-
-  event!(:foo_bar => 'baz', :foo => { :bar => 'quux' })
-
-...since we will expand the second hash into a :foo_bar key, but there is already
-one present.}
+    class << self
+      # Given a target Hash of properties in +target+, and a source Hash of properties in +source+, merges all properties
+      # in +source+ into +target+, obeying our hash-expansion rules (as specified in the introduction to this class).
+      # All new properties are added with their keys as Strings, and values must be:
+      #
+      # * A scalar of type Numeric (integer and floating-point numbers are both accepted), true, false, or nil;
+      # * A String or Symbol (and Symbols are converted to Strings before being used);
+      # * A Time;
+      # * A Hash, which will be recursively added using its key, plus an underscore, as the prefix
+      #   (that is, <tt>{ :foo => { :bar => :baz }}</tt> will become <tt>{ 'foo_bar' => 'baz' }</tt>);
+      # * An object that responds to <tt>#to_event_properties</tt>, which must in turn return a Hash; #to_event_properties
+      #   will be called, and it will then be treated exactly like a Hash, above.
+      #
+      # +prefix+ and +depth+ are only used for internal recursive calls:
+      #
+      # +prefix+ is a prefix that should be applied to all keys in the +source+ Hash before merging them into the +target+
+      # Hash. (Nothing is added to this prefix first, so, if you want an underscore separating it from the key, include
+      # the underscore in the +prefix+.)
+      #
+      # +depth+ should be an integer, indicating how many layers of recursive calls we've invoked; this is simply to
+      # prevent infinite recursion -- if this exceeds +MAX_DEPTH+, above, then an exception will be raised.
+      def merge_properties(target, source, prefix = nil, depth = 0)
+        if depth > MAX_DEPTH
+          raise "Nesting in EventTracker is too great; do you have a circular reference? " +
+            "We reached depth: #{depth.inspect}; expanding: #{source.inspect} with prefix #{prefix.inspect} into #{target.inspect}"
         end
 
-        case value
-        when Numeric, true, false, nil then target[prefixed_key] = value
-        when String then target[prefixed_key] = value.strip
-        when Symbol then target[prefixed_key] = value.to_s.strip
-        when Time then target[prefixed_key] = value
-        when Hash then merge_properties(target, value, "#{prefixed_key}_", depth + 1)
-        else
-          if value.respond_to?(:to_event_properties)
-            merge_properties(target, value.to_event_properties, "#{prefixed_key}_", depth + 1)
+        unless source.kind_of?(Hash)
+          raise ArgumentError, "You must supply a Hash for properties at #{prefix.inspect}; you supplied: #{source.inspect}"
+        end
+
+        source.each do |key, value|
+          prefixed_key = "#{prefix}#{key}"
+
+          if target.has_key?(prefixed_key)
+            raise PropertyCollisionError, %{Because of hash delegation, multiple properties with the key #{prefixed_key.inspect} are
+  present. This can happen, for example, if you do this:
+
+    event!(:foo_bar => 'baz', :foo => { :bar => 'quux' })
+
+  ...since we will expand the second hash into a :foo_bar key, but there is already
+  one present.}
+          end
+
+          case value
+          when Numeric, true, false, nil then target[prefixed_key] = value
+          when String then target[prefixed_key] = value.strip
+          when Symbol then target[prefixed_key] = value.to_s.strip
+          when Time then target[prefixed_key] = value
+          when Hash then merge_properties(target, value, "#{prefixed_key}_", depth + 1)
           else
-            raise ArgumentError, "Event property #{prefixed_key.inspect} is not a valid scalar, Hash, or object that " +
-              "responds to #to_event_properties, but rather #{value.inspect}."
+            if value.respond_to?(:to_event_properties)
+              merge_properties(target, value.to_event_properties, "#{prefixed_key}_", depth + 1)
+            else
+              raise ArgumentError, "Event property #{prefixed_key.inspect} is not a valid scalar, Hash, or object that " +
+                "responds to #to_event_properties, but rather #{value.inspect}."
+            end
           end
         end
       end
