@@ -52,15 +52,17 @@ describe MetaEvents::Tracker do
     expect((@receiver_2_calls || [ ])).to eq([ ])
   end
 
-  def expect_event(event_name, event_properties, receiver_name = "receiver_1", include_distinct_id = true)
-    calls = instance_variable_get("@#{receiver_name}_calls")
+  def expect_event(event_name, event_properties, options = { })
+    receiver_name = options[:receiver_name] || "receiver_1"
+    expected_distinct_id = if options.has_key?(:distinct_id) then options[:distinct_id] else @distinct_id end
 
-    event_properties['distinct_id'] ||= @distinct_id if include_distinct_id
+    calls = instance_variable_get("@#{receiver_name}_calls")
 
     expect(calls.length).to be > 0
     next_event = calls.shift
-    expect(next_event[0]).to eq(event_name)
-    expect(next_event[1]).to eq(event_properties)
+    expect(next_event[0]).to eq(expected_distinct_id)
+    expect(next_event[1]).to eq(event_name)
+    expect(next_event[2]).to eq(event_properties)
   end
 
   def tep_object(props)
@@ -113,10 +115,10 @@ EOS
     it "should allow changing the distinct ID at runtime" do
       i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
-      expect_event('xy1_foo_bar', { 'distinct_id' => @distinct_id })
+      expect_event('xy1_foo_bar', { }, :distinct_id => @distinct_id)
       i.distinct_id = '12345yoyoyo'
       i.event!(:foo, :bar, { })
-      expect_event('xy1_foo_bar', { 'distinct_id' => '12345yoyoyo' })
+      expect_event('xy1_foo_bar', { }, :distinct_id => '12345yoyoyo')
     end
 
     it "should not allow setting the distinct ID to an unsupported object" do
@@ -135,33 +137,33 @@ EOS
     it "should include the distinct_id set in the constructor" do
       i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
-      expect_event('xy1_foo_bar', { 'distinct_id' => @distinct_id })
+      expect_event('xy1_foo_bar', { }, :distinct_id => @distinct_id)
     end
 
     it "should allow overriding the distinct_id set in the constructor" do
       i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { :distinct_id => 12345 })
-      expect_event('xy1_foo_bar', { 'distinct_id' => 12345 })
+      expect_event('xy1_foo_bar', { }, :distinct_id => 12345)
     end
 
     it "should allow a nil distinct_id" do
       i = new_instance(nil, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
-      expect_event('xy1_foo_bar', { }, 'receiver_1', false)
+      expect_event('xy1_foo_bar', { }, :distinct_id => nil)
     end
 
     it "should allow a String distinct_id" do
       i = new_instance("foobarfoobar", :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
-      expect_event('xy1_foo_bar', { 'distinct_id' => 'foobarfoobar' })
+      expect_event('xy1_foo_bar', { }, :distinct_id => 'foobarfoobar')
     end
 
     it "should send the event to both receivers if asked" do
       @instance.event_receivers = [ receiver_1, receiver_2 ]
       @instance.event!(:foo, :bar, { })
 
-      expect_event("xy1_foo_bar", { 'user_name' => 'wilfred', 'user_hometown' => 'Fridley' }, :receiver_1)
-      expect_event("xy1_foo_bar", { 'user_name' => 'wilfred', 'user_hometown' => 'Fridley' }, :receiver_2)
+      expect_event("xy1_foo_bar", { 'user_name' => 'wilfred', 'user_hometown' => 'Fridley' }, :receiver_name => :receiver_1)
+      expect_event("xy1_foo_bar", { 'user_name' => 'wilfred', 'user_hometown' => 'Fridley' }, :receiver_name => :receiver_2)
     end
 
     it "should clone the class's default-receiver list on creation" do
@@ -171,7 +173,7 @@ EOS
         klass.default_event_receivers = [ receiver_2 ]
         i = klass.new(@distinct_id, :definitions => definition_set, :version => 1)
         i.event!(:foo, :bar, { })
-        expect_event('xy1_foo_bar', { }, :receiver_2)
+        expect_event('xy1_foo_bar', { }, :receiver_name => :receiver_2)
       ensure
         klass.default_event_receivers = [ ]
       end
@@ -180,7 +182,7 @@ EOS
     it "should allow overriding the list of receivers in the constructor" do
       i = klass.new(@distinct_id, :definitions => definition_set, :version => 1, :event_receivers => [ receiver_2 ])
       i.event!(:foo, :bar, { })
-      expect_event('xy1_foo_bar', { }, :receiver_2)
+      expect_event('xy1_foo_bar', { }, :receiver_name => :receiver_2)
     end
 
     it "should use the class's list of default definitions by default" do
@@ -286,7 +288,7 @@ EOS
     end
 
     def expand_scalar(value)
-      expand({ :foo => value })[:foo]
+      expand({ 'foo' => value })['foo']
     end
 
     it "should return proper values for scalars" do
@@ -309,22 +311,26 @@ EOS
       expect { expand_scalar([ 1, 2, 3 ]) }.to raise_error(ArgumentError)
     end
 
+    it "should stringify symbols on both keys and values" do
+      expect(expand({ :foo => :bar })).to eq({ 'foo' => 'bar' })
+    end
+
     it "should correctly expand simple hashes" do
-      expect(expand({ :foo => 'bar' })).to eq({ :foo => 'bar' })
-      expect(expand({ :zzz => ' bonkO ', 'bar' => :' baZZ ' })).to eq({ :zzz => 'bonkO', :bar => 'baZZ' })
+      expect(expand({ :foo => 'bar' })).to eq({ 'foo' => 'bar' })
+      expect(expand({ :zzz => ' bonkO ', 'bar' => :' baZZ ' })).to eq({ 'zzz' => 'bonkO', 'bar' => 'baZZ' })
     end
 
     it "should recursively expand hashes" do
-      expect(expand({ :foo => { :bar => ' whatEVs '} })).to eq({ :foo_bar => 'whatEVs' })
+      expect(expand({ :foo => { :bar => ' whatEVs '} })).to eq({ 'foo_bar' => 'whatEVs' })
       expect { expand({ :foo => { :bar => [ 1, 2, 3 ] } }) }.to raise_error(ArgumentError)
     end
 
     it "should call #to_event_properties for any object, and recursively expand that" do
-      expect(expand(:baz => tep_object({ :foo => ' BaR '}))).to eq({ :baz_foo => 'BaR' })
-      expect(expand(:baz => tep_object({ :foo => { :bar => ' yo yo yo '} }))).to eq({ :baz_foo_bar => 'yo yo yo' })
+      expect(expand(:baz => tep_object({ :foo => ' BaR '}))).to eq({ 'baz_foo' => 'BaR' })
+      expect(expand(:baz => tep_object({ :foo => { :bar => ' yo yo yo '} }))).to eq({ 'baz_foo_bar' => 'yo yo yo' })
 
       subsidiary = tep_object({ :bar => :baz })
-      expect(expand(:baz => tep_object({ :foo => subsidiary }))).to eq({ :baz_foo_bar => 'baz' })
+      expect(expand(:baz => tep_object({ :foo => subsidiary }))).to eq({ 'baz_foo_bar' => 'baz' })
     end
 
     it "should raise if it detects a property-name conflict" do

@@ -131,7 +131,7 @@ module MetaEvents
   #
   # This will result in a call to the event receivers that looks like this:
   #
-  #     receiver.track('ab1_user_signed_up', {
+  #     receiver.track('some_distinct_id', 'ab1_user_signed_up', {
   #         'user_first_name' => 'Jane',
   #         'user_last_name'  => 'Dunham',
   #         'user_city'       => 'Seattle',
@@ -170,7 +170,7 @@ module MetaEvents
   #
   # You'll end up with a set of properties like this:
   #
-  #     receiver.track('ab1_user_logged_in', {
+  #     receiver.track('some_distinct_id', 'ab1_user_logged_in', {
   #         'user_age' => 27,
   #         'user_payment_level' => 'enterprise',
   #         'user_city' => 'Seattle',
@@ -187,7 +187,7 @@ module MetaEvents
   #
   # ...becomes:
   #
-  #     receiver.track('ab1_user_sent_message', {
+  #     receiver.track('some_distinct_id', 'ab1_user_sent_message', {
   #         'from_age' => 27,
   #         'from_payment_level' => 'enterprise',
   #         'from_city' => 'Seattle',
@@ -338,10 +338,10 @@ module MetaEvents
       event.validate!(properties)
 
       name = event.full_name
-      properties = properties.stringify_keys
+      distinct_id = properties.delete('distinct_id')
 
       self.event_receivers.each do |receiver|
-        receiver.track(name, properties)
+        receiver.track(distinct_id, name, properties)
       end
     end
 
@@ -406,7 +406,7 @@ module MetaEvents
       end
 
       source.each do |key, value|
-        prefixed_key = "#{prefix}#{key}".to_sym
+        prefixed_key = "#{prefix}#{key}"
 
         if target.has_key?(prefixed_key)
           raise PropertyCollisionError, %{Because of hash delegation, multiple properties with the key #{prefixed_key.inspect} are
