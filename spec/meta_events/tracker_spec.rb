@@ -43,7 +43,8 @@ describe MetaEvents::Tracker do
   before :each do
     ::MetaEvents::Tracker.default_event_receivers = [ ]
     @user = tep_object(:name => 'wilfred', :hometown => 'Fridley')
-    @instance = new_instance(:definitions => definition_set, :version => 1, :implicit_properties => { :user => @user } )
+    @distinct_id = rand(1_000_000_000)
+    @instance = new_instance(@distinct_id, :definitions => definition_set, :version => 1, :implicit_properties => { :user => @user } )
   end
 
   after :each do
@@ -51,8 +52,10 @@ describe MetaEvents::Tracker do
     expect((@receiver_2_calls || [ ])).to eq([ ])
   end
 
-  def expect_event(event_name, event_properties, receiver_name = "receiver_1")
+  def expect_event(event_name, event_properties, receiver_name = "receiver_1", include_distinct_id = true)
     calls = instance_variable_get("@#{receiver_name}_calls")
+
+    event_properties['distinct_id'] ||= @distinct_id if include_distinct_id
 
     expect(calls.length).to be > 0
     next_event = calls.shift
@@ -68,7 +71,15 @@ describe MetaEvents::Tracker do
 
   describe "#initialize" do
     it "should validate its arguments" do
-      expect { new_instance(:version => 1, :definitions => definition_set, :foo => :bar) }.to raise_error(ArgumentError, /foo/i)
+      expect { new_instance(@distinct_id, :version => 1, :definitions => definition_set, :foo => :bar) }.to raise_error(ArgumentError, /foo/i)
+    end
+
+    it "should allow a nil distinct_id" do
+      expect { new_instance(nil, :definitions => definition_set, :version => 1) }.not_to raise_error
+    end
+
+    it "should not allow an invalid distinct_id" do
+      expect { new_instance(/foobar/, :definitions => definition_set, :version => 1) }.to raise_error(ArgumentError)
     end
 
     it "should be able to read definitions from a file" do
@@ -87,7 +98,7 @@ end
 EOS
         f.close
 
-        the_instance = new_instance(:definitions => f.path, :version => 1)
+        the_instance = new_instance(@distinct_id, :definitions => f.path, :version => 1)
         expect { the_instance.event!(:baz, :quux, :foo => :bar) }.not_to raise_error
         expect_event("fb1_baz_quux", { 'foo' => 'bar' })
         expect { the_instance.event!(:baz, :foo, :foo => :bar) }.to raise_error
@@ -98,11 +109,51 @@ EOS
     end
   end
 
+  describe "#distinct_id=" do
+    it "should allow changing the distinct ID at runtime" do
+      i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
+      i.event!(:foo, :bar, { })
+      expect_event('xy1_foo_bar', { 'distinct_id' => @distinct_id })
+      i.distinct_id = '12345yoyoyo'
+      i.event!(:foo, :bar, { })
+      expect_event('xy1_foo_bar', { 'distinct_id' => '12345yoyoyo' })
+    end
+
+    it "should not allow setting the distinct ID to an unsupported object" do
+      i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
+      expect { i.distinct_id = /foobar/ }.to raise_error(ArgumentError)
+    end
+  end
+
   describe "#track_event" do
     it "should allow firing a valid event" do
-      i = new_instance(:definitions => definition_set, :version => 1)
+      i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
       expect_event('xy1_foo_bar', { })
+    end
+
+    it "should include the distinct_id set in the constructor" do
+      i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
+      i.event!(:foo, :bar, { })
+      expect_event('xy1_foo_bar', { 'distinct_id' => @distinct_id })
+    end
+
+    it "should allow overriding the distinct_id set in the constructor" do
+      i = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
+      i.event!(:foo, :bar, { :distinct_id => 12345 })
+      expect_event('xy1_foo_bar', { 'distinct_id' => 12345 })
+    end
+
+    it "should allow a nil distinct_id" do
+      i = new_instance(nil, :definitions => definition_set, :version => 1)
+      i.event!(:foo, :bar, { })
+      expect_event('xy1_foo_bar', { }, 'receiver_1', false)
+    end
+
+    it "should allow a String distinct_id" do
+      i = new_instance("foobarfoobar", :definitions => definition_set, :version => 1)
+      i.event!(:foo, :bar, { })
+      expect_event('xy1_foo_bar', { 'distinct_id' => 'foobarfoobar' })
     end
 
     it "should send the event to both receivers if asked" do
@@ -118,7 +169,7 @@ EOS
 
       begin
         klass.default_event_receivers = [ receiver_2 ]
-        i = klass.new(:definitions => definition_set, :version => 1)
+        i = klass.new(@distinct_id, :definitions => definition_set, :version => 1)
         i.event!(:foo, :bar, { })
         expect_event('xy1_foo_bar', { }, :receiver_2)
       ensure
@@ -127,7 +178,7 @@ EOS
     end
 
     it "should allow overriding the list of receivers in the constructor" do
-      i = klass.new(:definitions => definition_set, :version => 1, :event_receivers => [ receiver_2 ])
+      i = klass.new(@distinct_id, :definitions => definition_set, :version => 1, :event_receivers => [ receiver_2 ])
       i.event!(:foo, :bar, { })
       expect_event('xy1_foo_bar', { }, :receiver_2)
     end
@@ -141,7 +192,7 @@ EOS
         end
       end
 
-      i = klass.new(:version => 1, :event_receivers => receiver_1)
+      i = klass.new(@distinct_id, :version => 1, :event_receivers => receiver_1)
       i.event!(:marph, :bonk)
       expect_event('zz1_marph_bonk', { })
     end
@@ -149,7 +200,7 @@ EOS
     it "should pick up the default version from the class" do
       klass.default_version = 2
 
-      i = klass.new(:event_receivers => receiver_1, :definitions => definition_set)
+      i = klass.new(@distinct_id, :event_receivers => receiver_1, :definitions => definition_set)
       i.event!(:foo, :quux)
       expect_event("xy2_foo_quux", { })
     end
@@ -225,7 +276,7 @@ EOS
 
   describe "#merge_properties" do
     before :each do
-      @instance = new_instance(:definitions => definition_set, :version => 1)
+      @instance = new_instance(@distinct_id, :definitions => definition_set, :version => 1)
     end
 
     def expand(hash)

@@ -9,15 +9,25 @@ module MetaEvents
   #
   # ## Instantiation and Lifecycle
   #
-  # MetaEvents::Tracker objects are quite lightweight. As such, you can give them pretty much any lifecycle you want. The
-  # key to figuring out the lifecycle is that an MetaEvents::Tracker can store _implicit properties_, which are simply a set
-  # of zero or more properties that will be added to any and all events fired through that tracker. (For what it's
-  # worth, properties set explicitly on a single event call override any implicit properties with the same name.)
+  # A MetaEvents::Tracker object is designed to be created once in each context where you're processing actions on
+  # behalf of a particular user -- for example, once in the request cycle in a Rails application, most likely as part
+  # of ApplicationController. This is because a Tracker accepts, in its constructor, a +distinct_id+, which is the
+  # way you identify a particular user to your events system. It is possible to override this on an event-by-event
+  # basis (by passing a +:distinct_id+ property explicitly to the event), but it is generally cleaner and easier to
+  # simply instantiate the MetaEvents::Tracker object once for each processing cycle.
   #
-  # As such, the ideal use of a Tracker is to create one for major situations where you gain access to a set of
-  # implicit properties -- for example, if you create one (using a +before_filter+ or just lazy initialization) in
-  # your Rails application's +ApplicationController+, then you can add lots of information about the current user
-  # in the implicit properties.
+  # Further, a Tracker accepts _implicit properties_ on creation; this is a set of zero or more properties that get
+  # automatically added to every event processed by the tracker. Typically, these will be user-centric properties,
+  # like the user's location, age, plan, or anything else. By using the support for #to_event_properties (below), the
+  # canonical form of Tracker instantiation looks something like:
+  #
+  #     event_tracker = MetaEvents::Tracker.new(current_user.id, :implicit_properties => { :user => current_user })
+  #
+  # ...which will automatically add all properties exposed by User#to_event_properties on every single event fired by
+  # that Tracker.
+  #
+  # See the discussion for #initialize, too -- there are certain things you want to do for logged-out users and at the
+  # point when a user signs up.
   #
   # If you concurrently are firing events from multiple versions in the MetaEvents DSL, you'll need to use multiple
   # MetaEvents::Tracker instances -- any given Tracker only works with a single version at once. Since the point of DSL
@@ -31,9 +41,10 @@ module MetaEvents
   # To make an MetaEvents::Tracker actually do something, it must have one or more _event receiver_s. An event receiver is
   # any object that responds to the following method:
   #
-  #     track(event_name, event_properties)
+  #     track(distinct_id, event_name, event_properties)
   #
-  # ...where +event_name+ is a String which is the full name of the event (more on that below), and +event_properties+
+  # ...where +distinct_id+ is a String or Integer that uniquely identifies the user for which we're firing the event,
+  # +event_name+ is a String which is the full name of the event (more on that below), and +event_properties+
   # is a map of String keys (the names of properties) to values that are numbers (any Numeric -- integer or
   # floating-point -- will do), true, false, nil, a Time, or a String. This interface is designed to be extremely simple, and
   # is modeled after the popular Mixpanel (https://www.mixpanel.com/) API.
@@ -46,8 +57,9 @@ module MetaEvents
   # if needed.
   #
   # Provided with this library is MetaEvents::TestReceiver, which will accept an IO object (like STDOUT), a Logger, or
-  # a block, and will accept events and write them as human-readable strings to this destination. Also, the 'mixpanel'
-  # gem is plug-compatible with this library -- an instance of Mixpanel::Tracker is a valid event receiver.
+  # a block, and will accept events and write them as human-readable strings to this destination. Also, the
+  # 'mixpanel-ruby' gem is plug-compatible with this library -- an instance of Mixpanel::Tracker is a valid event
+  # receiver.
   #
   # To specify the event receiver(s), you can (in order of popularity):
   #
@@ -246,7 +258,22 @@ module MetaEvents
     # The version of events that this Tracker is using.
     attr_reader :version
 
-    # Creates a new instance. +options+ can contain:
+    # Creates a new instance.
+    #
+    # +distinct_id+ is the "distinct ID" of the user on behalf of whom events are going to be fired; this can be +nil+
+    # if there is no such user (for example, if you're firing events from a background job that has nothing to do with
+    # any particular user). This will be automatically added to all events fired from this MetaEvents::Tracker as a
+    # property named +"distinct_id"+. Typically, this will be the primary key of your +users+ table, although it can
+    # be any unique identifier you want.
+    #
+    # (If a user has not logged in yet, you will probably want to assign them a unique ID anyway, via a cookie, and
+    # then pass this ID here. If the user logs in to an already-existing account, you probably just want to switch to
+    # using their logged-in user ID, since the stuff they did before they logged in isn't very interesting -- you
+    # already have them as a user. But if they sign up for a new account, you'll lose tracking across that boundary
+    # unless your events provider provides something like Mixpanel's +alias+ call; making that kind of call is beyond
+    # the scope of MetaEvents, and should be done separately.)
+    #
+    # +options+ can contain:
     #
     # [:definitions] If present, this can be anything accepted by ::MetaEvents::Definition::DefinitionSet#from, which will
     #                currently accept a pathname to a file, an +IO+ object that contains the text of definitions, or
@@ -263,7 +290,7 @@ module MetaEvents
     #                        with every event fired from this Tracker. This can use the hash-merge and object syntax
     #                        (#to_event_properties) documented above. Any properties explicitly passed with an event
     #                        that have the same name as these properties will override these properties for that event.
-    def initialize(options = { })
+    def initialize(distinct_id, options = { })
       options.assert_valid_keys(:definitions, :version, :implicit_properties, :event_receivers)
 
       definitions = options[:definitions] || self.class.default_definitions
@@ -280,8 +307,22 @@ module MetaEvents
 
       @implicit_properties = { }
       merge_properties(@implicit_properties, options[:implicit_properties] || { })
+      self.distinct_id = distinct_id if distinct_id
 
       self.event_receivers = Array(options[:event_receivers] || self.class.default_event_receivers.dup)
+    end
+
+    # Assigns a new distinct ID to this Tracker. Ordinarily, you will pass a distinct ID in the constructor; however,
+    # in certain cases, you will only have access to the distinct ID later, and this allows for that use case. (For
+    # example, if you create the Tracker in your Rails application's ApplicationController, then, when you process the
+    # login action for your application, there will be no distinct ID when the Tracker is created -- because the user
+    # does not have the proper cookie set yet -- but you'll discover the distinct ID in the middle of the action.)
+    def distinct_id=(new_distinct_id)
+      # merge_properties fails if there's a property collision -- but we still want to call it so that it validates
+      # whatever value we have. So we do it this way.
+      new_distinct_id_hash = { }
+      merge_properties(new_distinct_id_hash, { :distinct_id => new_distinct_id })
+      @implicit_properties.merge!(new_distinct_id_hash)
     end
 
     # Fires an event. +category_name+ must be the name of a category in the MetaEvents DSL (within the version that this
@@ -302,6 +343,16 @@ module MetaEvents
       self.event_receivers.each do |receiver|
         receiver.track(name, properties)
       end
+    end
+
+    class << self
+      def effective_properties(properties)
+
+      end
+    end
+
+    def effective_properties(category_name, event_name, additional_properties = { })
+
     end
 
     private
