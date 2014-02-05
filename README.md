@@ -193,7 +193,7 @@ need to be careful of any `#to_event_properties` methods you write. No matter ho
 the user can simply watch the requests being fired from their browser to Mixpanel (or whatever other events provider
 you use) and see what you're passing. This is no different than the situation would be without MetaEvents, but, because
 MetaEvents makes it so easy to add large amounts of properties (which is a good thing!), you should take extra care
-here.
+with your `#to_event_properties` methods once you start firing front-end events.
 
 ### More About Distinct IDs
 
