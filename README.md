@@ -262,6 +262,23 @@ to you.
 
 A few things before we're done:
 
+### Mixpanel, Aliasing, and People
+
+MetaEvents is _not_ intended as a complete superset of a backend analytics library (like Mixpanel) &mdash; there are
+features of those libraries that are not implemented via MetaEvents, and which should be used by direct calls to the
+service in question.
+
+For example, Mixpanel has an `alias` call that lets you tell it that a user with a particular distinct ID is actually
+the same person as a user with a different distinct ID &mdash; this is typically used at signup, when you convert from
+an "anonymous" distinct ID representing the unknown user who is poking around your site to the actual official user ID
+(typically your `users` table primary key) of that user. MetaEvents does not, in any way, attempt to support this; it
+allows you to pass whatever `distinct_id` you want in the `#event!` call, but, if you want to use `alias`, you should
+make that Mixpanel call directly.
+
+Similarly, Mixpanel's People functionality is not in any way directly supported by MetaEvents. You may well use the
+Tracker's `#effective_properties` method to compute a set of properties that you pass to Mixpanel's People system,
+but there are no calls directly in MetaEvents to do this for you.
+
 ### Retiring an Event
 
 Often you'll have events that you _retire_ &mdash; they were used in the past, but no longer. You could just delete
