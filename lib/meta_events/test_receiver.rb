@@ -12,8 +12,8 @@ module MetaEvents
       @target = target || block || ::Rails.logger
     end
 
-    def track(event_name, properties)
-      string = "Tracked event: #{event_name.inspect}"
+    def track(distinct_id, event_name, properties)
+      string = "Tracked event: user #{distinct_id.inspect}, #{event_name.inspect}"
       properties.keys.sort.each do |k|
         string << "\n    %30s: %s" % [ k, properties[k] ]
       end

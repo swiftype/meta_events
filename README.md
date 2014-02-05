@@ -4,7 +4,7 @@ and a powerful properties system that makes it easy to pass large numbers of con
 
 ### Background
 
-Sending user-centric events to (_e.g._) Mixpanel is far from difficult; iit's a single method call. However, in a
+Sending user-centric events to (_e.g._) Mixpanel is far from difficult; it's a single method call. However, in a
 large project, adding calls to Mixpanel all over eventually starts causing issues:
 
 * Understanding what, exactly, an event is tracking, including when it was introduced and when it was changed, is
@@ -72,12 +72,14 @@ Let's walk through this:
 
 To fire an event, we need an instance of `MetaEvents::Tracker`. For reasons to be explained shortly, we'll want an
 instance of this class to be created at a level where we may have things in common (like the current user) &mdash; so,
-in a Rails application, our `ApplicationController` is a good place:
+in a Rails application, our `ApplicationController` is a good place. We need to pass it the _distinct ID_ of the user
+that's signed in, which is almost always just the primary key from the `users` table &mdash; or `nil` if no user is
+currently signed in:
 
     class ApplicationController < ActionController::Base
       ...
       def event_tracker
-        @event_tracker ||= MetaEvents::Tracker.new
+        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id))
       end
       ...
     end
@@ -99,13 +101,14 @@ _event receivers_.
 
 ### Hooking Up Mixpanel and a Test Receiver
 
-An _event receiver_ is any object that responds to a method `#track(event_name, event_properties)`, where `event_name`
-is a `String` and `event_name` is a Hash mapping `String` property names to simple scalar values &mdash; `true`,
-`false`, `nil`, numbers (all `Numeric`s, including both integers and floating-point numbers, are supported), `String`s
-(and `Symbol`s will be converted to `String`s transparently), and `Time` objects.
+An _event receiver_ is any object that responds to a method `#track(distinct_id, event_name, event_properties)`, where
+`distinct_id` is the distinct ID of the user, `event_name` is a `String` and `event_name` is a Hash mapping `String`
+property names to simple scalar values &mdash; `true`, `false`, `nil`, numbers (all `Numeric`s, including both
+integers and floating-point numbers, are supported), `String`s (and `Symbol`s will be converted to `String`s
+transparently), and `Time` objects.
 
-Fortunately, the [Mixpanel](https://github.com/zevarito/mixpanel) Gem complies with this interface perfectly. So, in
-`config/environments/production.rb` (or any other file that loads before your first event gets fired):
+Fortunately, the [Mixpanel](https://github.com/mixpanel/mixpanel-ruby) Gem complies with this interface perfectly.
+So, in `config/environments/production.rb` (or any other file that loads before your first event gets fired):
 
     MetaEvents::Tracker.default_event_receivers << Mixpanel::Tracker.new("0123456789abcdef")
 
@@ -125,11 +128,45 @@ or a block (or anything responding to `call`), if you want it to go elsewhere.
 
 Now, when you fire an event, you should get output like this in your Rails log:
 
-    Tracked event: "ab1_user_signed_up"
+    Tracked event: user 483123, "ab1_user_signed_up"
                               user_age: 27
                            user_gender: female
 
 ...and, if you have configured Mixpanel properly, it will have been sent to Mixpanel, too!
+
+### More About Distinct IDs
+
+We glossed over the discussion of the distinct ID above. In short, it is a unique identifier (of no particular format;
+both Strings and integers are acceptable) that is unique to the user in question, based on your application's
+definition of 'user'. Using the primary key from your `users` table is typically a great way to do it.
+
+There are a few situations where you need to take special care, however:
+
+* **What about visitors who aren't signed in yet?** In this case, you will want to generate a unique ID and assign it
+  to the visitor anyway; generating a very large random number and putting it in a cookie in their browser is a good
+  way to do this, as well as using something like nginx's `ngx_http_userid_module`.
+  (Note that Mixpanel has facilities to do this automatically; however, it uses cookies set on their
+  domain, which means you can't read them, which limits it unacceptably &mdash; server-side code and even your own
+  Javascript will be unable to use this ID.)
+* **What do I do when a user logs in?** Typically, you simply want to switch completely from using their old
+  (cookie-based) unique ID to using the primary key of your `users` table (or whatever you use for tracking logged-in
+  users). This may seem counterintuitive, but it makes sense, particularly in broad consumer applications: until
+  someone logs in, all you really know is which _browser_ is hitting your site, not which _user_. Activity that happens
+  in the signed-out state might be the user who eventually logs in...but it also might not be, in the case of shared
+  machines; further, activity that happens before the user logs in is unlikely to be particularly interesting to you
+  &mdash; you already have the user as a registered user, and so this isn't a conversion or sign-up funnel. Effectively
+  treating the activity that happens before they sign in as a completely separate user is actually exactly the right
+  thing to do. The correct code structure is simply to call `#distinct_id=` on your `MetaEvents::Tracker` at exactly
+  the point at which you log them in (using your session, or a cookie, or whatever), and be done with it.
+* **What do I do when a user signs up?** This is the tricky case. You really want to correlate all the activity that
+  happened before the signup process with the activity afterwards, so that you can start seeing things like "users who
+  come in through funnel X convert to truly active/paid/whatever users at a higher rate than those through funnel Y".
+  This requires support from your back-end analytics provider; Mixpanel calls it _aliasing_, and it's accessed via
+  their `alias` call. It effectively says "the user with autogenerated ID X is the exact same user as the user with
+  primary-key ID Y". Making this call is beyond the scope of MetaEvents, but is quite easy to do assuming your
+  analytics provider supports it.
+
+You may also wish to see Mixpanel's documentation about distinct ID, [here](https://mixpanel.com/docs/managing-users/what-the-unique-identifer-does-and-why-its-important), [here](https://mixpanel.com/docs/managing-users/assigning-your-own-unique-identifiers-to-users), and [here](https://mixpanel.com/docs/integration-libraries/using-mixpanel-alias).
 
 # The Real Power of MetaEvents
 
@@ -154,7 +191,7 @@ You could add these to every single call to `#event!`, but MetaEvents has a bett
             :user_age => current_user.age
           )
         end
-        @event_tracker ||= MetaEvents::Tracker.new(:implicit_properties => implicit_properties)
+        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), :implicit_properties => implicit_properties)
       end
       ...
     end
@@ -273,7 +310,7 @@ the same person as a user with a different distinct ID &mdash; this is typically
 an "anonymous" distinct ID representing the unknown user who is poking around your site to the actual official user ID
 (typically your `users` table primary key) of that user. MetaEvents does not, in any way, attempt to support this; it
 allows you to pass whatever `distinct_id` you want in the `#event!` call, but, if you want to use `alias`, you should
-make that Mixpanel call directly.
+make that Mixpanel call directly. (See also the discussion above about _distinct ID_.)
 
 Similarly, Mixpanel's People functionality is not in any way directly supported by MetaEvents. You may well use the
 Tracker's `#effective_properties` method to compute a set of properties that you pass to Mixpanel's People system,
