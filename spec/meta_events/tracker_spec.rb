@@ -256,7 +256,8 @@ EOS
         :false => false,
         :string => 'foobar',
         :symbol => :bazbar,
-        :time => the_time
+        :time => the_time,
+        :stuff => [ "foo", :bar, 123, -9.45e+17, the_time, false, nil, true, "  BoNk " ]
         })
       expect_event('xy1_foo_bar', {
         'user_name' => 'wilfred',
@@ -267,7 +268,8 @@ EOS
         'false' => false,
         'string' => 'foobar',
         'symbol' => 'bazbar',
-        'time' => the_time
+        'time' => the_time.iso8601,
+        'stuff' => [ "foo", "bar", 123, -9.45e+17, the_time.iso8601, false, nil, true, "BoNk" ],
         })
     end
 
@@ -349,9 +351,9 @@ EOS
       expect(expand_scalar(nil)).to eq(nil)
     end
 
-    it "should raise an error for unknown data, including Arrays" do
+    it "should raise an error for unknown data, including Hashes" do
       expect { expand_scalar(/foobar/) }.to raise_error(ArgumentError)
-      expect { expand_scalar([ 1, 2, 3 ]) }.to raise_error(ArgumentError)
+      expect { expand_scalar([ "a", "b", /foo/ ]) }.to raise_error(ArgumentError)
     end
 
     it "should stringify symbols on both keys and values" do
@@ -365,7 +367,7 @@ EOS
 
     it "should recursively expand hashes" do
       expect(expand({ :foo => { :bar => ' whatEVs '} })).to eq({ 'foo_bar' => 'whatEVs' })
-      expect { expand({ :foo => { :bar => [ 1, 2, 3 ] } }) }.to raise_error(ArgumentError)
+      expect { expand({ :foo => { :bar => [ 1, 2, /foo/ ] } }) }.to raise_error(ArgumentError)
     end
 
     it "should call #to_event_properties for any object, and recursively expand that" do
@@ -393,7 +395,8 @@ EOS
         :foobar => 'foobar',
         :' FooBar  ' => 'FooBar',
         ' FooBar  ' => 'FooBar',
-        t => t,
+        t => t.iso8601,
+        [ "foo", :bar, 123, -9.45e+17, t, false, nil, true, "  BoNk " ] => [ "foo", "bar", 123, -9.45e+17, t.iso8601, false, nil, true, "BoNk" ],
         /foobar/ => :invalid_property_value,
         Object.new => :invalid_property_value
       }.each do |input, output|
