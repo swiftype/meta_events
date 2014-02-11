@@ -15,9 +15,16 @@ module MetaEvents
     def track(distinct_id, event_name, properties)
       string = "Tracked event: user #{distinct_id.inspect}, #{event_name.inspect}"
       properties.keys.sort.each do |k|
-        string << "\n    %30s: %s" % [ k, properties[k] ]
+        value = properties[k]
+        unless value == nil
+          string << "\n    %30s: %s" % [ k, properties[k] ]
+        end
       end
 
+      say(string)
+    end
+
+    def say(string)
       if @target.respond_to?(:call)
         @target.call "#{string}\n"
       elsif @target.respond_to?(:info)
