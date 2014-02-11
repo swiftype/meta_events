@@ -269,7 +269,7 @@ EOS
         'string' => 'foobar',
         'symbol' => 'bazbar',
         'time' => the_time.iso8601,
-        'stuff' => [ "foo", "bar", 123, -9.45e+17, the_time.iso8601, false, nil, true, "BoNk" ],
+        'stuff' => [ "foo", "bar", 123, -9.45e+17, the_time.utc.iso8601, false, nil, true, "BoNk" ],
         })
     end
 
@@ -395,7 +395,7 @@ EOS
         :foobar => 'foobar',
         :' FooBar  ' => 'FooBar',
         ' FooBar  ' => 'FooBar',
-        t => t.iso8601,
+        t => t.utc.iso8601,
         [ "foo", :bar, 123, -9.45e+17, t, false, nil, true, "  BoNk " ] => [ "foo", "bar", 123, -9.45e+17, t.iso8601, false, nil, true, "BoNk" ],
         /foobar/ => :invalid_property_value,
         Object.new => :invalid_property_value
