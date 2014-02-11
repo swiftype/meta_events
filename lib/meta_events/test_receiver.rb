@@ -13,7 +13,7 @@ module MetaEvents
     end
 
     def track(distinct_id, event_name, properties)
-      string = "Tracked event: user #{distinct_id.inspect}, #{event_name.inspect}"
+      string = "Tracked event: #{event_name.inspect} for user #{distinct_id.inspect}"
       properties.keys.sort.each do |k|
         value = properties[k]
         unless value == nil
