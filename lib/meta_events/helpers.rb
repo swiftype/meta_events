@@ -61,5 +61,14 @@ module MetaEvents
 
       link_to(name, options, meta_events_tracking_attributes_for(html_options, meta_events_tracker), &block)
     end
+
+
+    def meta_events_frontend_events_javascript
+      out = ""
+      (@_meta_events_registered_clientside_events || { }).each do |name, properties|
+        out << "MetaEvents.registerFrontendEvent(#{name.to_json}, #{properties.to_json});\n"
+      end
+      out.html_safe
+    end
   end
 end

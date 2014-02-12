@@ -4,6 +4,34 @@ MetaEvents = (function() {
   var forAllTrackableElementsRunCount = 0;
   var trackingPrefix = <%= MetaEvents::Helpers.meta_events_javascript_tracking_prefix.to_json %>;
 
+  var getOrCreateDomId = function(element, thisRunCount) {
+    var theId = element.id;
+
+    if (theId == null || theId == "") {
+      theId = "forAllTrackableElementsGeneratedIdForRunCount" + thisRunCount + "index" + index;
+      element.id = theId;
+    }
+
+    return theId;
+  };
+
+  var callOnTrackableElement = function(element, thisRunCount) {
+    var theId = getOrCreateDomId(element, thisRunCount);
+    var eventName = $(element).data(trackingPrefix + "-evt");
+    var eventProperties = $(element).data(trackingPrefix + "-prp");
+
+    if (! (eventName == null || eventName == "" || eventProperties == null)) {
+      applyFunction(theId, element, eventName, eventProperties);
+      <% if Rails.env.development? %>
+    } else {
+      $(element).data(registeredPropertyName, true);
+      throw "No Mixpanel event name or event properties on element that has class '." + trackingPrefix + "_trk', which tags it for tracking. Element: " + element;
+      <% end %>
+    }
+
+    $(element).data(registeredPropertyName, true);
+  };
+
   out.forAllTrackableElements = function(startingElement, applyFunction) {
     var thisRunCount = forAllTrackableElementsRunCount;
     forAllTrackableElementsRunCount++;
@@ -13,29 +41,46 @@ MetaEvents = (function() {
       var registered = $(element).data(registeredPropertyName);
 
       if (registered == null) {
-        var theId = element.id;
-
-        if (theId == null || theId == "") {
-          theId = "forAllTrackableElementsGeneratedIdForRunCount" + thisRunCount + "index" + index;
-          element.id = theId;
-        }
-
-        var eventName = $(element).data(trackingPrefix + "-evt");
-        var eventProperties = $(element).data(trackingPrefix + "-prp");
-
-        if (! (eventName == null || eventName == "" || eventProperties == null)) {
-          applyFunction(theId, element, eventName, eventProperties);
-          <% if Rails.env.development? %>
-        } else {
-          $(element).data(registeredPropertyName, true);
-          throw "No Mixpanel event name or event properties on element that has class '." + trackingPrefix + "_trk', which tags it for tracking. Element: " + element;
-          <% end %>
-        }
-
-        $(element).data(registeredPropertyName, true);
+        callOnTrackableElement(element, thisRunCount);
       }
     });
   };
+
+  var events = { };
+
+  out.registerFrontendEvent = function(name, eventData) {
+    events[name] = eventData;
+  };
+
+  out.event = function(eventAlias) {
+    var eventData = events[eventAlias];
+
+    if (eventData == null) {
+      <% if Rails.env.development? %>
+      throw "No front-end event has been registered named '" + name + "'. Did you forget to call meta_events_define_frontend_event on the server?";
+      <% end %>
+      return;
+    }
+
+    var effectiveProperties = { };
+    $.extend(effectiveProperties, eventData.properties);
+
+    for (var i = 1; i < arguments.length; ++i) {
+      $.extend(effectiveProperties, arguments[i]);
+    }
+
+    this.eventHandler(eventData.event_name, effectiveProperties);
+  };
+
+  out.mixpanelEventHandler = function(eventName, properties) {
+    mixpanel.track(eventName, properties);
+  };
+
+  out.setEventHandler = function(eventHandler) {
+    this.eventHandler = eventHandler;
+  };
+
+  out.setEventHandler(out.mixpanelEventHandler);
 
   return out;
 }());

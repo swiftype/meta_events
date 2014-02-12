@@ -5,7 +5,13 @@ module MetaEvents
     end
 
     initializer "meta_events.configure_rails_initialization" do
-      ActionView::Base.send :include, ::MetaEvents::Helpers
+      ::ActiveSupport.on_load(:action_view) do
+        include ::MetaEvents::Helpers
+      end
+
+      ::ActiveSupport.on_load(:action_controller) do
+        include ::MetaEvents::ControllerMethods
+      end
 
       return if ::MetaEvents::Tracker.default_definitions
 
