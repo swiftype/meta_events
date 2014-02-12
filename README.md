@@ -429,6 +429,11 @@ introspection, and could easily be extended to, _e.g._, generate HTML fully docu
 
 Patches are welcome. ;-)
 
+### Times
+
+MetaEvents correctly converts any `Time` object you pass into the correct String format for Mixpanel (_e.g._,
+`2014-02-03T15:49:17`), converting it to UTC first. This should make your times much cleaner.
+
 ### Adding a New Version
 
 What is this top-level `version` in the DSL? Well, every once in a while, you will want to completely redo your set of

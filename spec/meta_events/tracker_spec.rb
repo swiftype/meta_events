@@ -289,7 +289,7 @@ EOS
     end
 
     it "should pass through lots of different kinds of properties" do
-      the_time = Time.now
+      the_time = Time.parse("2008-09-04 3:46:12 PM -08:00")
       @instance.event!(:foo, :bar, {
         :num1 => 42,
         :num2 => 6.0221413e+23,
@@ -309,8 +309,8 @@ EOS
         'false' => false,
         'string' => 'foobar',
         'symbol' => 'bazbar',
-        'time' => the_time.iso8601,
-        'stuff' => [ "foo", "bar", 123, -9.45e+17, the_time.utc.iso8601, false, nil, true, "BoNk" ],
+        'time' => "2008-09-04T23:46:12",
+        'stuff' => [ "foo", "bar", 123, -9.45e+17, "2008-09-04T23:46:12", false, nil, true, "BoNk" ],
         })
     end
 
@@ -426,7 +426,7 @@ EOS
 
   describe "#normalize_scalar_property_value" do
     it "should return the correct results for scalars" do
-      t = Time.now
+      t = Time.parse("2008-09-04 3:46:12 PM -08:00")
       {
         nil => nil,
         true => true,
@@ -436,8 +436,8 @@ EOS
         :foobar => 'foobar',
         :' FooBar  ' => 'FooBar',
         ' FooBar  ' => 'FooBar',
-        t => t.utc.iso8601,
-        [ "foo", :bar, 123, -9.45e+17, t, false, nil, true, "  BoNk " ] => [ "foo", "bar", 123, -9.45e+17, t.iso8601, false, nil, true, "BoNk" ],
+        t => "2008-09-04T23:46:12",
+        [ "foo", :bar, 123, -9.45e+17, t, false, nil, true, "  BoNk " ] => [ "foo", "bar", 123, -9.45e+17, "2008-09-04T23:46:12", false, nil, true, "BoNk" ],
         /foobar/ => :invalid_property_value,
         Object.new => :invalid_property_value
       }.each do |input, output|

@@ -472,7 +472,7 @@ module MetaEvents
         when Numeric, true, false, nil then value
         when String then value.strip
         when Symbol then value.to_s.strip
-        when Time then value.utc.iso8601
+        when Time then value.utc.strftime("%Y-%m-%dT%H:%M:%S")
         when Array then
           out = value.map { |e| normalize_scalar_property_value(e) }
           out = :invalid_property_value if out.detect { |e| e == :invalid_property_value }
