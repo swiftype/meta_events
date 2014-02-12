@@ -24,7 +24,7 @@ MetaEvents = (function() {
         var eventProperties = $(element).data(trackingPrefix + "-prp");
 
         if (! (eventName == null || eventName == "" || eventProperties == null)) {
-          applyFunction("#" + theId, element, eventName, eventProperties);
+          applyFunction(theId, element, eventName, eventProperties);
           <% if Rails.env.development? %>
         } else {
           $(element).data(registeredPropertyName, true);

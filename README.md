@@ -32,6 +32,8 @@ User) should expose, and then simply pass that object in your event &mdash; this
 lots of properties, and be consistent about them.
 1. **Implicit properties support** means you can add contextual properties (like the currently-logged-in user) in a
 single place, and then have every event include those properties.
+1. **Front-end integration** lets you very easily track events from DOM elements (like links) using JavaScript, and
+use a powerful mechanism to fire front-end events in any way you want.
 
 # Getting Started
 
@@ -144,57 +146,113 @@ Further, there are certain events (scrolling, JavaScript manipulation in the bro
 exist on the back end and can't be tracked from there &mdash; at least, not without adding calls back to your server
 from the front-end JavaScript.
 
-Fortunately, MetaEvents provides a tool to make this process very easy &mdash; the `#effective_properties` method,
-which returns everything you need to fire an event. Let's use Mixpanel's built-in
-[`track_links`](https://mixpanel.com/docs/integration-libraries/javascript-full-api#track_links) method from their
-JavaScript API to track some links, using MetaEvents:
+**IMPORTANT**: In case it isn't obvious, _any property you include in a front-end event is visible to your users_.
+No matter what tricks you might include to obscure that data, it fundamentally will be present on your users' computers
+and thus visible to them if they want to take a look. This is no different  than the situation would be without
+MetaEvents, but, because MetaEvents makes it so easy to add large amounts of properties (which is a good thing!),
+you should take extra care with your `#to_event_properties` methods once you start firing front-end events.
 
-    # in app/helpers/application_helper.rb:
-    module ApplicationHelper
-      ...
-      def track_links(css_selector, event_category, event_name, additional_properties)
-        event_data = @event_tracker.effective_properties(event_category, event_name, additional_properties)
-        net_properties = event_data[:properties].merge('distinct_id' => event_data[:distinct_id])
-        "mixpanel.track_links(#{css_selector.to_json}, #{event_data[:event_name].to_json}, #{net_properties.to_json})".html_safe
-      end
-      ...
-    end
+You can fire front-end events with MetaEvents in two ways: _auto-tracking_ and _property expansion_.
 
-    # in our view:
-    <a href="http://www.google.com" id="#bailed_out_to_google">Bail out to Google</a>
-    ...
-    <script type="text/javascript">
-      <%= track_links("#bailed_out_to_google", :user, :bailed_out_to_google, :game => @game) %>
+#### Auto-Tracking
+
+Auto-tracking is the easiest way of triggering front-end events. MetaEvents provides a Rails helper method that adds
+certain attributes to any DOM element you wish (like a link); it then provides a JavaScript function that automatically
+picks up these attributes, decodes them, and calls any function you want with them.
+
+As an example, in a view, you simply convert:
+
+    <%= link_to("go here", user_awesome_path, :class => "my_class") %>
+
+...to:
+
+    <%= meta_events_tracked_link_to("go here", user_awesome_path, :class => "my_class",
+                                    :meta_event => { :category => :user, :event => :awesome,
+                                                     :properties => { :color => 'green' } }) %>
+
+(Not immediately obvious: the `:meta_event` attribute is just part of the `html_options` `Hash` that
+`link_to` accepts, not an additional parameter. `meta_events_tracked_link_to` accepts exactly the same parameters as
+`link_to`.)
+
+This automatically turns the generated HTML from:
+
+    <a href="/users/awesome" class="my_class">go here</a>
+
+to something like this:
+
+    <a href="/users/awesome" class="my_class mejtp_trk" data-mejtp-event="ab1_user_awesome"
+       data-mejtp-prp="{&quot;ip&quot;:&quot;127.0.0.1&quot;,&quot;color&quot;:&quot;green&quot;,&quot;implicit_prop_1&quot;:&quot;someValue&quot;}">go here</a>
+
+`mejtp` stands for "MetaEvents JavaScript Tracking Prefix", and is simply a likely-unique prefix for these values.
+(You can change it with `MetaEvents::Helpers.meta_events_javascript_tracking_prefix 'foo'`.) `mejtp_trk` is the class
+that allows us to easily detect which elements are set up for tracking; the two data attributes pass the full name
+of the event, and a JSON-encoded string of all the properties (both implicit and explicit) to pass with the event.
+
+Now, add this to a Javascript file in your application:
+
+    //= require meta_events
+
+And, finally, call something like this:
+
+    $(document).ready(function() {
+      MetaEvents.forAllTrackableElements(document, function(id, element, eventName, properties) {
+        mixpanel.track_links("#" + id, eventName, properties);
+      })
+    });
+
+`MetaEvents.forAllTrackableElements` accepts a root element to start searching at, and a callback function. It finds
+all elements with class `mejtp_trk` on them underneath that element, extracts the event name and properties, and adds
+a generated DOM ID to that element if it doesn't have one already. It then calls your callback function, passing that
+(existing or generated) DOM ID, the element itself, the name of the event, and the full set of properties (decoded, as
+a JavaScript Object here). You can then (as above) easily use this to do anything you want, like telling Mixpanel to
+track that link properly.
+
+`forAllTrackableElements` also sets a certain data attribute on each link as it processes it, so it's safe to call as
+often as you wish &mdash; for example, if the DOM changes. It does _not_ know when the DOM changes, however, so, if you
+add content to your page, you will need to re-call it.
+
+#### Property Expansion
+
+If you need to do something more sophisticated than auto-tracking, you can also still easily leverage MetaEvents.
+`MetaEvents::Tracker` has the `#effective_properties` method,
+which returns everything you need to fire an event. For example, say we want to fire a Mixpanel event in some
+arbitrary location in JavaScript code. We can easily have our view generate exactly the event name and properties we
+want to fire. We'll change this:
+
+    <script>
+      someJavascriptCall("foo");
     </script>
 
-This small snippet of code can result in the following call to Mixpanel, nicely populated with lots and lots of
-properties (and correctly validated against your MetaEvents DSL):
+to:
 
-    mixpanel.track_links("#bailed_out_to_google", "ab1_user_bailed_out_to_google", {
-        user_first_name: "Jack",
-        user_last_name: "Johnson",
-        user_age: 27,
-        user_gender: true,
-        user_country: "US",
-        user_language: "en_US",
-        user_source: "Bing",
-        game_name: "Scrabble",
-        game_level: 7,
-        game_experience: 13,
-        ...
-      })
+    <script>
+    <% data = event_tracker.effective_properties(:user, :did_some_call, { :color => :green }) %>
+      someJavascriptCall("foo", <%= data.to_json %>)
+    </script>
 
-(Here, we are passing the `distinct_id` explicitly inside the properties. You could also embed a call to
-`Mixpanel.identify(#{@event_tracker.distinct_id.to_json})` in the page separately, or otherwise manage the distinct
-ID any way you want.)
+This will pass, as the second argument to `someJavascriptCall`, a JavaScript Object that looks something like this:
 
-**IMPORTANT**: In case it isn't obvious, realize that, once you start doing this,
-_all properties you include in front-end events are potentially visible to your users_ &mdash; and, in particular, you
-need to be careful of any `#to_event_properties` methods you write. No matter how you store the data in the browser,
-the user can simply watch the requests being fired from their browser to Mixpanel (or whatever other events provider
-you use) and see what you're passing. This is no different than the situation would be without MetaEvents, but, because
-MetaEvents makes it so easy to add large amounts of properties (which is a good thing!), you should take extra care
-with your `#to_event_properties` methods once you start firing front-end events.
+    {
+      distinct_id: 12389045,
+      event_name:  "ab1_user_did_some_call",
+      properties: {
+        ip: "127.0.0.1",
+        color: "green",
+        implicit_prop_1: "someValue"
+      }
+    }
+
+In other words, `effective_properties` returns a Ruby Hash that contains the `:distinct_id`, the fully-qualified
+`:event_name`, and `:properties`, mapping to all properties that should be passed with that call. You can pass this
+around to any code that needs it, and do anything you want with it. This gives you a flexible interface to do anything
+you want.
+
+You may ask: why do I need to have Ruby code generate this data for me? Why not expose a JavaScript interface to the
+same thing? This would be easier in the front-end in certain situations; however, this would also mean reimplementing
+quite a lot of MetaEvents in pure JavaScript &mdash; it would have to have a good chunk of the MetaEvents DSL, all
+the property-normalizing and -resolution code, all the hash merging, and it _still_ would have to make you pass
+certain Ruby objects into it (like a `User`, for example, if you want all of a `User`'s properties). It's much better
+to keep that data server-side, and only expose what we need.
 
 ### More About Distinct IDs
 

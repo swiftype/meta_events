@@ -22,22 +22,26 @@ module MetaEvents
     end
 
     def meta_events_tracking_attributes_for(input_attributes, event_tracker)
+      return input_attributes unless input_attributes && input_attributes[:meta_event]
+
       output_attributes = input_attributes.dup
+      event_data = output_attributes.delete(:meta_event)
 
-      category = output_attributes.delete(:event_category)
-      name = output_attributes.delete(:event_name)
-      properties = output_attributes.delete(:event_properties)
-
-      return input_attributes unless category || name || properties
-
-      unless category && name && properties
-        raise ArgumentError, %{If you're adding event-tracking attributes to an element, you must either supply none of,
-or all of, :event_category, :event_name, and :event_properties. (:event_properties can be an empty Hash
-if you truly want to pass no additional properties; but you must supply it, so we know you didn't
-just forget it.}
+      unless event_data.kind_of?(Hash)
+        raise ArgumentError, ":meta_event must be a Hash, not: #{event_data.inspect}"
       end
 
-      props_data = event_tracker.effective_properties(category, name, properties)
+      event_data.assert_valid_keys(:category, :event, :event_properties)
+
+      category = event_data[:category]
+      event = event_data[:event]
+      properties = event_data[:event_properties] || { }
+
+      unless category && event
+        raise ArgumentError, "You must supply :category and :event in your :meta_event attributes, not: #{event_data.inspect}"
+      end
+
+      props_data = event_tracker.effective_properties(category, event, properties)
 
       classes = Array(output_attributes.delete(:class) || [ ])
       classes << meta_events_prefix_attribute("trk")
