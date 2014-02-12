@@ -31,11 +31,11 @@ module MetaEvents
         raise ArgumentError, ":meta_event must be a Hash, not: #{event_data.inspect}"
       end
 
-      event_data.assert_valid_keys(:category, :event, :event_properties)
+      event_data.assert_valid_keys(:category, :event, :properties)
 
       category = event_data[:category]
       event = event_data[:event]
-      properties = event_data[:event_properties] || { }
+      properties = event_data[:properties] || { }
 
       unless category && event
         raise ArgumentError, "You must supply :category and :event in your :meta_event attributes, not: #{event_data.inspect}"
@@ -55,8 +55,8 @@ module MetaEvents
     end
 
     def meta_events_tracked_link_to(name = nil, options = nil, html_options = nil, &block)
-      unless html_options && html_options[:event_category]
-        raise ArgumentError, "You asked for a tracked link, but you didn't provide an :event_category: #{html_options.inspect}"
+      unless html_options && html_options[:meta_event]
+        raise ArgumentError, "You asked for a tracked link, but you didn't provide a :meta_event: #{html_options.inspect}"
       end
 
       link_to(name, options, meta_events_tracking_attributes_for(html_options, meta_events_tracker), &block)
