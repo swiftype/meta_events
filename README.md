@@ -74,12 +74,13 @@ To fire an event, we need an instance of `MetaEvents::Tracker`. For reasons to b
 instance of this class to be created at a level where we may have things in common (like the current user) &mdash; so,
 in a Rails application, our `ApplicationController` is a good place. We need to pass it the _distinct ID_ of the user
 that's signed in, which is almost always just the primary key from the `users` table &mdash; or `nil` if no user is
-currently signed in:
+currently signed in. We also pass it the IP address of the user (which can safely be `nil`); Mixpanel, for example,
+uses this for doing geolocation of users:
 
     class ApplicationController < ActionController::Base
       ...
       def event_tracker
-        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id))
+        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip)
       end
       ...
     end
@@ -252,7 +253,8 @@ You could add these to every single call to `#event!`, but MetaEvents has a bett
             :user_age => current_user.age
           )
         end
-        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), :implicit_properties => implicit_properties)
+        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip,
+                                                   :implicit_properties => implicit_properties)
       end
       ...
     end
