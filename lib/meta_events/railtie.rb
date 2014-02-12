@@ -5,6 +5,8 @@ module MetaEvents
     end
 
     initializer "meta_events.configure_rails_initialization" do
+      ActionView::Base.send :include, ::MetaEvents::Helpers
+
       return if ::MetaEvents::Tracker.default_definitions
 
       config_meta_events = File.expand_path(File.join(::Rails.root, 'config', 'meta_events.rb'))

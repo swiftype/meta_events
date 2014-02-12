@@ -2,6 +2,7 @@ require "meta_events/version"
 require "meta_events/definition/definition_set"
 require "meta_events/tracker"
 require "meta_events/test_receiver"
+require "meta_events/helpers"
 
 # See if we can load Rails -- but don't fail if we can't; we'll just use this to decide whether we should
 # load the Railtie or not.
