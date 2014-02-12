@@ -1,0 +1,41 @@
+var MetaEvents = window.MetaEvents || {};
+MetaEvents = (function() {
+  var out = {};
+  var forAllTrackableElementsRunCount = 0;
+  var trackingPrefix = <%= MetaEvents::Helpers.meta_events_javascript_tracking_prefix.to_json %>;
+
+  out.forAllTrackableElements = function(startingElement, applyFunction) {
+    var thisRunCount = forAllTrackableElementsRunCount;
+    forAllTrackableElementsRunCount++;
+
+    $(startingElement).find("." + trackingPrefix + "_trk").each(function(index, element) {
+      var registeredPropertyName = trackingPrefix + "_reg";
+      var registered = $(element).data(registeredPropertyName);
+
+      if (registered == null) {
+        var theId = element.id;
+
+        if (theId == null || theId == "") {
+          theId = "forAllTrackableElementsGeneratedIdForRunCount" + thisRunCount + "index" + index;
+          element.id = theId;
+        }
+
+        var eventName = $(element).data(trackingPrefix + "-evt");
+        var eventProperties = $(element).data(trackingPrefix + "-prp");
+
+        if (! (eventName == null || eventName == "" || eventProperties == null)) {
+          applyFunction("#" + theId, element, eventName, eventProperties);
+          <% if Rails.env.development? %>
+        } else {
+          $(element).data(registeredPropertyName, true);
+          throw "No Mixpanel event name or event properties on element that has class '." + trackingPrefix + "_trk', which tags it for tracking. Element: " + element;
+          <% end %>
+        }
+
+        $(element).data(registeredPropertyName, true);
+      }
+    });
+  };
+
+  return out;
+}());
