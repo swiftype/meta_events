@@ -276,13 +276,13 @@ and fires it off.
 ##### Aliasing Event Names
 
 If you need to be able to fire the exact same event with _different_ sets of properties from different places in a
-single page, you can alias the event:
+single page, you can alias the event using the `:name` property:
 
     class GameController < ApplicationController
       def game
         ...
-        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :winning }, { :alias => :paused_while_winning })
-        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :losing }, { :alias => :paused_while_losing })
+        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :winning }, { :name => :paused_while_winning })
+        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :losing }, { :name => :paused_while_losing })
         ...
       end
     end

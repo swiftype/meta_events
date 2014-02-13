@@ -7,7 +7,7 @@ module MetaEvents
     def meta_events_define_frontend_event(category, event, properties = { }, options = { })
       options.assert_valid_keys(:name)
 
-      name = options[:name] || "#{category}_#{event}"
+      name = (options[:name] || "#{category}_#{event}").to_s
 
       @_meta_events_registered_clientside_events ||= { }
       @_meta_events_registered_clientside_events[name] = meta_events_tracker.effective_properties(category, event, properties)

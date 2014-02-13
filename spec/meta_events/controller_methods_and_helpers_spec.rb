@@ -10,7 +10,7 @@ describe MetaEvents::ControllerMethods do
         end
       end
     end
-    @tracker = ::MetaEvents::Tracker.new("abc123", nil, :definitions => @definition_set)
+    @tracker = ::MetaEvents::Tracker.new("abc123", nil, :definitions => @definition_set, :implicit_properties => { :imp1 => 'imp1val1' })
 
     @klass = Class.new do
       class << self
@@ -40,6 +40,20 @@ describe MetaEvents::ControllerMethods do
   end
 
   describe "frontend-event registration" do
+    def expect_defined_event(name, event_name, properties)
+        expect(@obj.meta_events_defined_frontend_events[name]).to eq({
+          :distinct_id => "abc123",
+          :event_name => event_name,
+          :properties => properties
+        })
+
+        js = @obj.meta_events_frontend_events_javascript
+        expect(js).to match(/MetaEvents\.registerFrontendEvent\s*\(\s*["']#{name}["']/i)
+        js =~ /#{name}["']\s*,\s*(.*?)\s*\)\s*\;/i
+        hash = JSON.parse($1)
+        expect(hash).to eq('distinct_id' => 'abc123', 'event_name' => event_name, 'properties' => properties)
+    end
+
     it "should work fine if there are no registered events" do
       expect(@obj.meta_events_defined_frontend_events).to eq({ })
       expect(@obj.meta_events_frontend_events_javascript).to eq("")
@@ -49,17 +63,44 @@ describe MetaEvents::ControllerMethods do
       expect { @obj.meta_events_define_frontend_event(:foo, :quux) }.to raise_error(ArgumentError, /quux/i)
     end
 
+    it "should let you alias the event to anything you want" do
+      @obj.meta_events_define_frontend_event(:foo, :bar, { :aaa => 'bbb' }, :name => 'zyxwvu')
+      expect_defined_event('zyxwvu', 'xy1_foo_bar', { 'imp1' => 'imp1val1', 'aaa' => 'bbb' })
+    end
+
+    it "should let you overwrite implicit properties and do hash expansion" do
+      @obj.meta_events_define_frontend_event(:foo, :bar, { :imp1 => 'imp1val2', :a => { :b => 'c', :d => 'e' } })
+      expect_defined_event('foo_bar', 'xy1_foo_bar', { 'imp1' => 'imp1val2', 'a_b' => 'c', 'a_d' => 'e' })
+    end
+
     context "with one simple defined event" do
       before :each do
         @obj.meta_events_define_frontend_event(:foo, :bar, { :quux => 123 })
       end
 
-      it "should output that event in the JavaScript" do
-        js = @obj.meta_events_frontend_events_javascript
-        expect(js).to match(/MetaEvents\.registerFrontendEvent\s*\(\s*["']foo_bar["']/i)
-        js =~ /foo_bar["']\s*,\s*(.*?)\s*\)\s*\;/i
-        hash = JSON.parse($1)
-        expect(hash).to eq('distinct_id' => 'abc123', 'event_name' => 'xy1_foo_bar', 'properties' => { 'quux' => 123 })
+      it "should output that event (only) in the JavaScript and via meta_events_define_frontend_event" do
+        expect(@obj.meta_events_defined_frontend_events.keys).to eq(%w{foo_bar})
+        expect_defined_event('foo_bar', 'xy1_foo_bar', { 'quux' => 123, 'imp1' => 'imp1val1' })
+      end
+
+      it "should overwrite the event if a new one is registered" do
+        @obj.meta_events_define_frontend_event(:foo, :baz, { :marph => 345 }, :name => 'foo_bar')
+        expect_defined_event('foo_bar', 'xy1_foo_baz', { 'marph' => 345, 'imp1' => 'imp1val1' })
+      end
+    end
+
+    context "with three defined events" do
+      before :each do
+        @obj.meta_events_define_frontend_event(:foo, :bar, { :quux => 123 })
+        @obj.meta_events_define_frontend_event(:foo, :bar, { :quux => 345 }, { :name => :voodoo })
+        @obj.meta_events_define_frontend_event(:foo, :baz, { :marph => 'whatever' })
+      end
+
+      it "should output all the events in the JavaScript and via meta_events_define_frontend_event" do
+        expect(@obj.meta_events_defined_frontend_events.keys.sort).to eq(%w{foo_bar foo_baz voodoo}.sort)
+        expect_defined_event('foo_bar', 'xy1_foo_bar', { 'quux' => 123, 'imp1' => 'imp1val1' })
+        expect_defined_event('voodoo', 'xy1_foo_bar', { 'quux' => 345, 'imp1' => 'imp1val1' })
+        expect_defined_event('foo_baz', 'xy1_foo_baz', { 'marph' => 'whatever', 'imp1' => 'imp1val1' })
       end
     end
   end
