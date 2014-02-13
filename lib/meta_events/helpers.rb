@@ -21,17 +21,18 @@ module MetaEvents
       "#{MetaEvents::Helpers.meta_events_javascript_tracking_prefix}_#{name}"
     end
 
-    def meta_events_tracking_attributes_for(input_attributes, event_tracker)
-      return input_attributes unless input_attributes && input_attributes[:meta_event]
+    def meta_events_tracking_attributes_for(input_attributes, event_tracker = meta_events_tracker)
+      return input_attributes unless input_attributes && (input_attributes[:meta_event] || input_attributes['meta_event'])
 
-      output_attributes = input_attributes.dup
+      # #with_indifferent_access dups the Hash even if it already has indifferent access, which is important here
+      output_attributes = input_attributes.with_indifferent_access
       event_data = output_attributes.delete(:meta_event)
 
       unless event_data.kind_of?(Hash)
         raise ArgumentError, ":meta_event must be a Hash, not: #{event_data.inspect}"
       end
 
-      event_data.assert_valid_keys(:category, :event, :properties)
+      event_data.assert_valid_keys(%w{category event properties})
 
       category = event_data[:category]
       event = event_data[:event]
@@ -47,9 +48,8 @@ module MetaEvents
       classes << meta_events_prefix_attribute("trk")
       output_attributes[:class] = classes
 
-      data = (output_attributes[:data] ||= { })
-      data[meta_events_prefix_attribute("evt")] = props_data[:event_name]
-      data[meta_events_prefix_attribute("prp")] = props_data[:properties].to_json
+      output_attributes["data-#{meta_events_prefix_attribute('evt')}"] = props_data[:event_name]
+      output_attributes["data-#{meta_events_prefix_attribute('prp')}"] = props_data[:properties].to_json
 
       output_attributes
     end

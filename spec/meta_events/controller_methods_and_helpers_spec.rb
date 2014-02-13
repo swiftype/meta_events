@@ -104,4 +104,88 @@ describe MetaEvents::ControllerMethods do
       end
     end
   end
+
+  describe "auto-tracking" do
+    def meta4(h)
+      @obj.meta_events_tracking_attributes_for(h, @tracker)
+    end
+
+    it "should return the input attributes unchanged if there is no :meta_event" do
+      input = { :foo => 'bar', :bar => 'baz' }
+      expect(meta4(input)).to be(input)
+    end
+
+    it "should fail if :meta_event is not a Hash" do
+      expect { meta4(:meta_event => 'bonk') }.to raise_error(ArgumentError)
+    end
+
+    it "should fail if :meta_event contains unknown keys" do
+      me = { :category => 'foo', :event => 'bar', :properties => { }, :extra => 'whatever' }
+      expect { meta4(:meta_event => me) }.to raise_error(ArgumentError)
+    end
+
+    it "should fail if there is no :category" do
+      me = { :event => 'bar', :properties => { } }
+      expect { meta4(:meta_event => me) }.to raise_error(ArgumentError)
+    end
+
+    it "should fail if there is no :event" do
+      me = { :category => 'foo', :properties => { } }
+      expect { meta4(:meta_event => me) }.to raise_error(ArgumentError)
+    end
+
+    def expect_meta4(input, classes, event_name, properties)
+      attrs = meta4(input)
+
+      expect(attrs['class']).to eq(classes)
+
+      expect(attrs['data-mejtp_evt']).to eq(event_name)
+      prps = JSON.parse(attrs['data-mejtp_prp'])
+      expect(prps).to eq(properties)
+
+      remaining = attrs.dup
+      remaining.delete('data-mejtp_evt')
+      remaining.delete('data-mejtp_prp')
+
+      remaining
+    end
+
+    it "should add class, evt, and prp correctly, and remove :meta_event" do
+      me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me }, %w{mejtp_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to be_nil
+    end
+
+    it "should combine the class with an existing class string" do
+      me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me, :class => 'bonko baz' }, [ 'bonko baz', 'mejtp_trk' ], 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to be_nil
+    end
+
+    it "should combine the class with an existing class array" do
+      me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me, :class => %w{bonko baz} }, %w{bonko baz mejtp_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to be_nil
+    end
+
+    it "should preserve existing attributes" do
+      me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me, :yo => 'there' }, %w{mejtp_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to be_nil
+      expect(remaining[:yo]).to eq('there')
+    end
+
+    it "should preserve existing data attributes" do
+      me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me, :data => { :foo => 'bar', :bar => 'baz' } }, %w{mejtp_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to eq({ 'foo' => 'bar', 'bar' => 'baz' })
+    end
+
+    it "should preserve existing data attributes that aren't a Hash" do
+      me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me, :data => "whatever", :'data-foo' => 'bar' }, %w{mejtp_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to eq('whatever')
+      expect(remaining['data-foo']).to eq('bar')
+    end
+  end
 end
