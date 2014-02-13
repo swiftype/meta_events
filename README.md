@@ -152,7 +152,7 @@ and thus visible to them if they want to take a look. This is no different  than
 MetaEvents, but, because MetaEvents makes it so easy to add large amounts of properties (which is a good thing!),
 you should take extra care with your `#to_event_properties` methods once you start firing front-end events.
 
-You can fire front-end events with MetaEvents in two ways: _auto-tracking_ and _property expansion_.
+You can fire front-end events with MetaEvents in two ways: _auto-tracking_ and _frontend events_.
 
 #### Auto-Tracking
 
@@ -211,48 +211,103 @@ track that link properly.
 often as you wish &mdash; for example, if the DOM changes. It does _not_ know when the DOM changes, however, so, if you
 add content to your page, you will need to re-call it.
 
-#### Property Expansion
+#### Frontend Events
 
-If you need to do something more sophisticated than auto-tracking, you can also still easily leverage MetaEvents.
-`MetaEvents::Tracker` has the `#effective_properties` method,
-which returns everything you need to fire an event. For example, say we want to fire a Mixpanel event in some
-arbitrary location in JavaScript code. We can easily have our view generate exactly the event name and properties we
-want to fire. We'll change this:
+Use Frontend Events only if Auto-Tracking isn't flexible enough for your purposes; Auto-Tracking is simpler in
+most ways.
 
-    <script>
-      someJavascriptCall("foo");
-    </script>
+Because MetaEvents leverages the events DSL to define events, and calls methods on your Ruby models (and other objects)
+to create large numbers of properties, you cannot simply fire an event by name from the front-end without a _little_
+extra work &mdash; otherwise, how would we get those properties? However, it's not much more work.
 
-to:
+First off, make sure you get this into your layout in a `<script>` tag somewhere &mdash; at the bottom of the page is
+perfectly fine:
 
-    <script>
-    <% data = event_tracker.effective_properties(:user, :did_some_call, { :color => :green }) %>
-      someJavascriptCall("foo", <%= data.to_json %>)
-    </script>
+    <%= meta_events_frontend_events_javascript %>
 
-This will pass, as the second argument to `someJavascriptCall`, a JavaScript Object that looks something like this:
+This allows MetaEvents to pass event data properly from the backend to the frontend for any events you'll be firing.
 
-    {
-      distinct_id: 12389045,
-      event_name:  "ab1_user_did_some_call",
-      properties: {
-        ip: "127.0.0.1",
-        color: "green",
-        implicit_prop_1: "someValue"
-      }
+Now, as an example, let's imagine we implement a JavaScript game on our site, and want to fire events when the user
+wins, loses, or gets a new high score. First, let's define those in our DSL:
+
+    global_events_prefix :ab
+
+    version 1, "2014-02-11" do
+      category :jsgame do
+        event :won, "2014-02-11", "user won a game!"
+        event :lost, "2014-02-11", "user lost a game"
+        event :new_high_score, "2014-02-11", "user got a new high score"
+      end
+    end
+
+Now, in whatever controller action renders the page that the game is on, we need to _register_ these events. This
+tells the front-end integration that we might fire them from the resulting page; it therefore embeds JavaScript in the
+page that defines the set of properties for those events, so that the front end has access to the data it needs:
+
+    class GameController < ApplicationController
+      def game
+        ...
+        meta_events_define_frontend_event(:jsgame, :won, { :winning_streak => current_winning_streak })
+        meta_events_define_frontend_event(:jsgame, :lost, { :losing_streak => current_losing_streak })
+        meta_events_define_frontend_event(:jsgame, :new_high_score, { :previous_high_score => current_high_score })
+        ...
+      end
+    end
+
+This will allow us to make the following calls in the frontend, from our game code:
+
+    if (wonGame) {
+      MetaEvents.event('jsgame_won');
+    } else {
+      MetaEvents.event('jsgame_lost');
     }
 
-In other words, `effective_properties` returns a Ruby Hash that contains the `:distinct_id`, the fully-qualified
-`:event_name`, and `:properties`, mapping to all properties that should be passed with that call. You can pass this
-around to any code that needs it, and do anything you want with it. This gives you a flexible interface to do anything
-you want.
+    if (currentScore > highScore) {
+      MetaEvents.event('jsgame_new_high_score', { score: currentScore });
+    }
 
-You may ask: why do I need to have Ruby code generate this data for me? Why not expose a JavaScript interface to the
-same thing? This would be easier in the front-end in certain situations; however, this would also mean reimplementing
-quite a lot of MetaEvents in pure JavaScript &mdash; it would have to have a good chunk of the MetaEvents DSL, all
-the property-normalizing and -resolution code, all the hash merging, and it _still_ would have to make you pass
-certain Ruby objects into it (like a `User`, for example, if you want all of a `User`'s properties). It's much better
-to keep that data server-side, and only expose what we need.
+What's happened here is that `meta_events_define_frontend_event` took the set of properties you passed, merged them
+with any implicit properties defined, and passed them to the frontend via the `meta_events_frontend_events_javascript`
+output we added above. It binds each event to an _event alias_, which, by default, is just the category name and the
+event name, joined with an underscore. So when you call `MetaEvents.event`, it simply takes the string you pass it,
+looks up the event stored under that alias, merges any properties you supply with the ones passed from the backend,
+and fires it off.
+
+##### Aliasing Event Names
+
+If you need to be able to fire the exact same event with _different_ sets of properties from different places in a
+single page, you can alias the event:
+
+    class GameController < ApplicationController
+      def game
+        ...
+        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :winning }, { :alias => :paused_while_winning })
+        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :losing }, { :alias => :paused_while_losing })
+        ...
+      end
+    end
+
+    ...
+    if (winning) {
+      MetaEvents.event('paused_while_winning');
+    } else {
+      MetaEvents.event('paused_while_losing');
+    }
+
+Both calls from the JavaScript will fire the event `ab1_jsgame_paused_game`, but one of them will pass
+`while: 'winning'`, and the other `while: 'losing'`.
+
+##### Definition Cycle
+
+Calls to `meta_events_define_frontend_event` get aggregated on the current controller object, during the request
+cycle. If you have events that can get fired on any page, then, for example, use a `before_filter` to always
+define them, or a method you mix in and call, or any other mechanism you want.
+
+##### The Frontend Events Handler
+
+`MetaEvents.event` calls the current _frontend event handler_ on the `MetaEvents` JavaScript object; by default this
+just calls `mixpanel.track`. By calling `MetaEvents.setEventHandler(myFunction)`, you can set it to anything you want;
+it gets passed the fully-qualified event name and set of all properties.
 
 ### More About Distinct IDs
 
