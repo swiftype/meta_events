@@ -18,11 +18,7 @@ module MetaEvents
     end
 
     included do
-      begin
-        helper_method :meta_events_define_frontend_event, :meta_events_defined_frontend_events
-      rescue Exception => e
-        $stderr.puts "(#{e.class.name}) #{e}!"
-      end
+      helper_method :meta_events_define_frontend_event, :meta_events_defined_frontend_events
     end
   end
 end
