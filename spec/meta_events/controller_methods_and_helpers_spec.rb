@@ -24,6 +24,16 @@ describe MetaEvents::ControllerMethods do
         end
       end
 
+      def link_to(*args, &block)
+        @_link_to_calls ||= [ ]
+        @_link_to_calls << args + [ block ]
+        "link_to_call_#{@_link_to_calls.length}"
+      end
+
+      def link_to_calls
+        @_link_to_calls
+      end
+
       attr_accessor :meta_events_tracker
 
       include MetaEvents::ControllerMethods
@@ -134,18 +144,19 @@ describe MetaEvents::ControllerMethods do
       expect { meta4(:meta_event => me) }.to raise_error(ArgumentError)
     end
 
-    def expect_meta4(input, classes, event_name, properties)
+    def expect_meta4(input, classes, event_name, properties, options = { })
       attrs = meta4(input)
 
+      expected_prefix = options[:prefix] || "mejtp"
       expect(attrs['class']).to eq(classes)
 
-      expect(attrs['data-mejtp_evt']).to eq(event_name)
-      prps = JSON.parse(attrs['data-mejtp_prp'])
+      expect(attrs["data-#{expected_prefix}_evt"]).to eq(event_name)
+      prps = JSON.parse(attrs["data-#{expected_prefix}_prp"])
       expect(prps).to eq(properties)
 
       remaining = attrs.dup
-      remaining.delete('data-mejtp_evt')
-      remaining.delete('data-mejtp_prp')
+      remaining.delete("data-#{expected_prefix}_evt")
+      remaining.delete("data-#{expected_prefix}_prp")
 
       remaining
     end
@@ -186,6 +197,41 @@ describe MetaEvents::ControllerMethods do
       remaining = expect_meta4({ :meta_event => me, :data => "whatever", :'data-foo' => 'bar' }, %w{mejtp_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
       expect(remaining['data']).to eq('whatever')
       expect(remaining['data-foo']).to eq('bar')
+    end
+
+    it "should let you change the tracking prefix" do
+      MetaEvents::Helpers.meta_events_javascript_tracking_prefix 'foo'
+      begin
+        me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
+        remaining = expect_meta4({ :meta_event => me }, %w{foo_trk}, 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' }, { :prefix => 'foo' })
+        expect(remaining['data']).to be_nil
+      ensure
+        MetaEvents::Helpers.meta_events_javascript_tracking_prefix 'mejtp'
+      end
+    end
+
+    describe "#meta_events_tracked_link_to" do
+      it "should raise if there is no :meta_event" do
+        expect { @obj.meta_events_tracked_link_to("foobar", "barfoo") }.to raise_error(ArgumentError)
+      end
+
+      it "should call through to #link_to properly for a simple case" do
+        retval = @obj.meta_events_tracked_link_to("foobar", "barfoo", { :meta_event => { :category => :foo, :event => :bar, :properties => { :a => :b }} })
+        expect(retval).to eq("link_to_call_1")
+
+        calls = @obj.link_to_calls
+        expect(calls.length).to eq(1)
+
+        call = calls[0]
+        expect(call.length).to eq(4)
+        expect(call[0]).to eq("foobar")
+        expect(call[1]).to eq("barfoo")
+        expect(call[2].keys.sort).to eq(%w{class data-mejtp_evt data-mejtp_prp}.sort)
+        expect(call[2]['class']).to eq([ 'mejtp_trk' ])
+        expect(call[2]['data-mejtp_evt']).to eq('xy1_foo_bar')
+        prp = JSON.parse(call[2]['data-mejtp_prp'])
+        expect(prp).to eq({ 'imp1' => 'imp1val1', 'a' => 'b' })
+      end
     end
   end
 end
