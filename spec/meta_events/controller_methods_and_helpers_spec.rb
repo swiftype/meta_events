@@ -46,22 +46,23 @@ describe MetaEvents::ControllerMethods do
 
   it "should register the proper helper methods" do
     expect(@klass.helper_methods_registered.map(&:to_s).sort).to eq(
-      [ :meta_events_define_frontend_event, :meta_events_defined_frontend_events ].map(&:to_s).sort)
+      [ :meta_events_define_frontend_event, :meta_events_defined_frontend_events, :meta_events_tracker ].map(&:to_s).sort)
   end
 
   describe "frontend-event registration" do
-    def expect_defined_event(name, event_name, properties)
-        expect(@obj.meta_events_defined_frontend_events[name]).to eq({
-          :distinct_id => "abc123",
-          :event_name => event_name,
-          :properties => properties
-        })
+    def expect_defined_event(name, event_name, properties, options = { })
+      expected_distinct_id = options[:distinct_id] || 'abc123'
+      expect(@obj.meta_events_defined_frontend_events[name]).to eq({
+        :distinct_id => expected_distinct_id,
+        :event_name => event_name,
+        :properties => properties
+      })
 
-        js = @obj.meta_events_frontend_events_javascript
-        expect(js).to match(/MetaEvents\.registerFrontendEvent\s*\(\s*["']#{name}["']/i)
-        js =~ /#{name}["']\s*,\s*(.*?)\s*\)\s*\;/i
-        hash = JSON.parse($1)
-        expect(hash).to eq('distinct_id' => 'abc123', 'event_name' => event_name, 'properties' => properties)
+      js = @obj.meta_events_frontend_events_javascript
+      expect(js).to match(/MetaEvents\.registerFrontendEvent\s*\(\s*["']#{name}["']/i)
+      js =~ /#{name}["']\s*,\s*(.*?)\s*\)\s*\;/i
+      hash = JSON.parse($1)
+      expect(hash).to eq('distinct_id' => expected_distinct_id, 'event_name' => event_name, 'properties' => properties)
     end
 
     it "should work fine if there are no registered events" do
@@ -76,6 +77,20 @@ describe MetaEvents::ControllerMethods do
     it "should let you alias the event to anything you want" do
       @obj.meta_events_define_frontend_event(:foo, :bar, { :aaa => 'bbb' }, :name => 'zyxwvu')
       expect_defined_event('zyxwvu', 'xy1_foo_bar', { 'imp1' => 'imp1val1', 'aaa' => 'bbb' })
+    end
+
+    it "should let you override the tracker if you want" do
+      ds2 = MetaEvents::Definition::DefinitionSet.new(:global_events_prefix => "ab") do
+        version 2, '2014-01-31' do
+          category :aaa do
+            event :bbb, '2014-01-31', 'this is bar'
+          end
+        end
+      end
+      t2 = ::MetaEvents::Tracker.new("def345", nil, :definitions => ds2, :version => 2)
+
+      @obj.meta_events_define_frontend_event(:aaa, :bbb, { }, :tracker => t2)
+      expect_defined_event('aaa_bbb', 'ab2_aaa_bbb', { }, { :distinct_id => 'def345' })
     end
 
     it "should let you overwrite implicit properties and do hash expansion" do

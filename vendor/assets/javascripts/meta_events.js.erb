@@ -1,22 +1,51 @@
 var MetaEvents = window.MetaEvents || {};
+/**
+ * Defines the MetaEvents JavaScript module. This provides client-side functions that support MetaEvents'
+ * auto-tracking and frontend events systems; see README.md for more information.
+ */
 MetaEvents = (function() {
-  var out = {};
-  var forAllTrackableElementsRunCount = 0;
+  var out = {}; // The public object that we'll return.
+  var createDomIdUniqueId = 0; // Helps us ensure we generate truly unique DOM IDs.
+  // See MetaEvents::Helpers.meta_events_javascript_tracking_prefix for more details; just copies that string.
   var trackingPrefix = <%= MetaEvents::Helpers.meta_events_javascript_tracking_prefix.to_json %>;
 
-  var getOrCreateDomId = function(element, thisRunCount) {
+  /**
+   * Given a DOM element, ensures that it has a DOM ID on it. Returns its unique DOM ID -- either the one it already
+   * had, or the newly-generated synthetic ID.
+   *
+   * @param element - The DOM element that you want to make sure has an ID.
+   */
+  var getOrCreateDomId = function(element) {
     var theId = element.id;
 
     if (theId == null || theId == "") {
-      theId = "forAllTrackableElementsGeneratedIdForRunCount" + thisRunCount + "index" + index;
+      theId = "metaEventsSyntheticDomId" + createDomIdUniqueId++;
       element.id = theId;
     }
 
     return theId;
   };
 
-  var callOnTrackableElement = function(element, thisRunCount) {
-    var theId = getOrCreateDomId(element, thisRunCount);
+  /**
+   * Given a DOM element that should be used with auto-tracking, calls a specified function, passing in the unique
+   * DOM ID of the element (which will be generated if necessary), the element itself, the name of the event that
+   * should be fired, and the set of properties that should be fired with that event.
+   *
+   * After the specified function is called and returns successfully, the element is marked (via a jQuery data
+   * attribute) so that it will never again have that function called.
+   *
+   * @param element - The element that we should use
+   * @param applyFunction - The function that we'll call on that element, unless it has already been called
+   */
+  var registerTrackableElement = function(element, applyFunction) {
+    var registeredPropertyName = trackingPrefix + "_reg";
+    var registered = $(element).data(registeredPropertyName);
+
+    if (registered != null) {
+      return;
+    }
+
+    var theId = getOrCreateDomId(element);
     var eventName = $(element).data(trackingPrefix + "-evt");
     var eventProperties = $(element).data(trackingPrefix + "-prp");
 
@@ -32,26 +61,56 @@ MetaEvents = (function() {
     $(element).data(registeredPropertyName, true);
   };
 
+  /**
+   * Given a DOM element to start with and a function, finds all elements underneath that DOM element that have been
+   * enabled for auto-tracking (using #meta_events_tracking_attributes_for or #meta_events_tracked_link_to), and
+   * calls the given function on each one, in turn.
+   *
+   * The function will never be called twice for the same element (since the element is marked as having been passed to
+   * the function once it's done); this means that it's safe to call as often as you want -- for example, when the
+   * DOM changes.
+   *
+   * The function passed should accept the following parameters, in this order:
+   *    id - the DOM ID of the element; one will be generated for it and assigned to it if not already present
+   *    element - the element itself
+   *    eventName - the name of the event that this DOM element should fire
+   *    eventProperties - an object containing the properties that should be included with that event
+   *
+   * @param startingElement - The element under which we should search
+   * @param applyFunction - The function we should call on each element
+   */
   out.forAllTrackableElements = function(startingElement, applyFunction) {
-    var thisRunCount = forAllTrackableElementsRunCount;
-    forAllTrackableElementsRunCount++;
-
     $(startingElement).find("." + trackingPrefix + "_trk").each(function(index, element) {
-      var registeredPropertyName = trackingPrefix + "_reg";
-      var registered = $(element).data(registeredPropertyName);
-
-      if (registered == null) {
-        callOnTrackableElement(element, thisRunCount);
-      }
+      registerTrackableElement(element, applyFunction);
     });
   };
 
   var events = { };
 
+  /**
+   * Called to register a frontend event that was defined server-side.
+   *
+   * @param name - The name that we'll use to access this event, using 'event', below; this is different from the name
+   *               of the actual event that will be fired and need not have any correlation;
+   * @param eventData - The data for the event; this must be an object containing 'event_name', which is the name of
+   *                    the event to fire, and 'properties', the set of properties to fire with that event.
+   */
   out.registerFrontendEvent = function(name, eventData) {
     events[name] = eventData;
   };
 
+  /**
+   * Fires a frontend event. Accepts the name (alias) that we use to access the event, and zero or more objects; all
+   * properties of those objects are merged together (with later objects overriding earlier ones) and then merged into
+   * the properties the server told us to fire with the event (again, with our properties overriding it), and then the
+   * event is fired by calling the current handler function set by 'setEventHandler', below (which, by default, calls
+   * Mixpanel).
+   *
+   * @param eventAlias - The alias for the event to fire, which must match a call to registerFrontendEvent(), above;
+   *                     this is typically created by the +meta_events_frontend_events_javascript+ method in
+   *                     MetaEvents::Helpers that's called Rails-side to generate appropriate JavaScript code in the
+   *                     page somewhere.
+   */
   out.event = function(eventAlias) {
     var eventData = events[eventAlias];
 
@@ -72,10 +131,19 @@ MetaEvents = (function() {
     this.eventHandler(eventData.event_name, effectiveProperties);
   };
 
+  /**
+   * The default event handler that we use if you haven't called setEventHandler(), below.
+   */
   out.mixpanelEventHandler = function(eventName, properties) {
     mixpanel.track(eventName, properties);
   };
 
+  /**
+   * When a frontend event is fired, there's a function, at the bottom, that actually fires the event; it gets passed
+   * two parameters -- the name of the event, and properties to pass with it. By default, we use mixpanelEventHandler,
+   * above, which, well, calls Mixpanel. This function allows you to change that to any function you want, in case you
+   * want to do something different.
+   */
   out.setEventHandler = function(eventHandler) {
     this.eventHandler = eventHandler;
   };

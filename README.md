@@ -152,7 +152,10 @@ and thus visible to them if they want to take a look. This is no different  than
 MetaEvents, but, because MetaEvents makes it so easy to add large amounts of properties (which is a good thing!),
 you should take extra care with your `#to_event_properties` methods once you start firing front-end events.
 
-You can fire front-end events with MetaEvents in two ways: _auto-tracking_ and _frontend events_.
+You can fire front-end events with MetaEvents in two ways: _auto-tracking_ and _frontend events_. Both methods require
+the use of Rails (because `MetaEvents::ControllerMethods` is intended for use with `ActionController`, and
+`MetaEvents::Helpers` is intended for use with `ActionView`), although the techniques are generally applicable and
+easy enough to use with any framework.
 
 #### Auto-Tracking
 
@@ -271,7 +274,8 @@ with any implicit properties defined, and passed them to the frontend via the `m
 output we added above. It binds each event to an _event alias_, which, by default, is just the category name and the
 event name, joined with an underscore. So when you call `MetaEvents.event`, it simply takes the string you pass it,
 looks up the event stored under that alias, merges any properties you supply with the ones passed from the backend,
-and fires it off.
+and fires it off. (You can, in fact, supply as many additional JavaScript objects/hashes as you want after the
+event alias; they will all be merged together, along with the properties supplied by the backend.)
 
 ##### Aliasing Event Names
 
