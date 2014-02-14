@@ -210,9 +210,10 @@ a generated DOM ID to that element if it doesn't have one already. It then calls
 a JavaScript Object here). You can then (as above) easily use this to do anything you want, like telling Mixpanel to
 track that link properly.
 
-`forAllTrackableElements` also sets a certain data attribute on each link as it processes it, so it's safe to call as
-often as you wish &mdash; for example, if the DOM changes. It does _not_ know when the DOM changes, however, so, if you
-add content to your page, you will need to re-call it.
+`forAllTrackableElements` also sets a certain data attribute on each element as it processes it, and knows to skip
+elements that already have that attribute set, so it's safe to call as often as you wish &mdash; for example, if
+the DOM changes. It does _not_ know when the DOM changes, however, so, if you add content to your page, you will
+need to re-call it.
 
 #### Frontend Events
 

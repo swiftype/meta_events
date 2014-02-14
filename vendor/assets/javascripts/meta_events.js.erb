@@ -46,8 +46,8 @@ MetaEvents = (function() {
     }
 
     var theId = getOrCreateDomId(element);
-    var eventName = $(element).data(trackingPrefix + "-evt");
-    var eventProperties = $(element).data(trackingPrefix + "-prp");
+    var eventName = $(element).data(trackingPrefix + "_evt");
+    var eventProperties = $(element).data(trackingPrefix + "_prp");
 
     if (! (eventName == null || eventName == "" || eventProperties == null)) {
       applyFunction(theId, element, eventName, eventProperties);

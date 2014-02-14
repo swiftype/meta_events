@@ -1,3 +1,5 @@
+require 'active_support/core_ext/numeric/time'
+
 describe MetaEvents::Tracker do
   subject(:klass) { MetaEvents::Tracker }
   let(:definition_set) do
@@ -297,6 +299,10 @@ EOS
         :false => false,
         :string => 'foobar',
         :symbol => :bazbar,
+        :time_interval => 3.months,
+        :pos_infinity => (+1.0/0.0),
+        :nan => (0.0/0.0),
+        :neg_infinity => (-1.0/0.0),
         :time => the_time,
         :stuff => [ "foo", :bar, 123, -9.45e+17, the_time, false, nil, true, "  BoNk " ]
         })
@@ -309,6 +315,10 @@ EOS
         'false' => false,
         'string' => 'foobar',
         'symbol' => 'bazbar',
+        'time_interval' => 7776000,
+        'pos_infinity' => "+infinity",
+        'nan' => 'NaN',
+        'neg_infinity' => "-infinity",
         'time' => "2008-09-04T23:46:12",
         'stuff' => [ "foo", "bar", 123, -9.45e+17, "2008-09-04T23:46:12", false, nil, true, "BoNk" ],
         })
@@ -433,6 +443,10 @@ EOS
         false => false,
         3 => 3,
         42.5e+17 => 42.5e+17,
+        3.months => 7776000,
+        Float::INFINITY => "+infinity",
+        Float::NAN => "NaN",
+        -Float::INFINITY => "-infinity",
         :foobar => 'foobar',
         :' FooBar  ' => 'FooBar',
         ' FooBar  ' => 'FooBar',

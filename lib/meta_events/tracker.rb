@@ -456,7 +456,7 @@ module MetaEvents
               merge_properties(target, value.to_event_properties, "#{prefixed_key}_", depth + 1)
             else
               raise ArgumentError, "Event property #{prefixed_key.inspect} is not a valid scalar, Hash, or object that " +
-                "responds to #to_event_properties, but rather #{value.inspect}."
+                "responds to #to_event_properties, but rather #{value.inspect} (#{value.class.name})."
             end
           else
             target[prefixed_key] = net_value
@@ -468,8 +468,15 @@ module MetaEvents
       # resulting set of properties (for example, converting Symbols to Strings) or returns +:invalid_property_value+
       # if that isn't a valid scalar value for a property.
       def normalize_scalar_property_value(value)
+        return "NaN" if value.kind_of?(Float) && value.nan?
+
         case value
-        when Numeric, true, false, nil then value
+        when true, false, nil then value
+        when ActiveSupport::Duration then value.to_i
+        when Float::INFINITY then "+infinity"
+        when -Float::INFINITY then "-infinity"
+        when Float::NAN then "NaN"
+        when Numeric then value
         when String then value.strip
         when Symbol then value.to_s.strip
         when Time then value.utc.strftime("%Y-%m-%dT%H:%M:%S")
