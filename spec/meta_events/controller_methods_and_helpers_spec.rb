@@ -60,7 +60,8 @@ describe MetaEvents::ControllerMethods do
 
       js = @obj.meta_events_frontend_events_javascript
       expect(js).to match(/MetaEvents\.registerFrontendEvent\s*\(\s*["']#{name}["']/i)
-      js =~ /#{name}["']\s*,\s*(.*?)\s*\)\s*\;/i
+      js =~ /["']#{name}["']\s*,\s*(.*?)\s*\)\s*\;/i
+      matched = $1
       hash = JSON.parse($1)
       expect(hash).to eq('distinct_id' => expected_distinct_id, 'event_name' => event_name, 'properties' => properties)
     end
