@@ -2,6 +2,15 @@
 [Mixpanel](https://www.mixpanel.com/) and provides structure, documentation, and a historical record to events,
 and a powerful properties system that makes it easy to pass large numbers of consistent properties with your events.
 
+MetaEvents supports:
+
+* Ruby 1.8.7, 1.9.3, 2.0.0, 2.1.0, or JRuby 1.7.9
+
+These are, however, just the versions it's tested against; MetaEvents contains no code that should be at all
+particularly dependent on exact Ruby versions, and should be compatible with a broad set of versions.
+
+Current build status: ![Current Build Status](https://api.travis-ci.org/swiftype/meta_events.png?branch=master)
+
 ### Background
 
 Sending user-centric events to (_e.g._) Mixpanel is far from difficult; it's a single method call. However, in a
