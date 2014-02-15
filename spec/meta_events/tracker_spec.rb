@@ -1,4 +1,5 @@
 require 'active_support/core_ext/numeric/time'
+require 'ipaddr'
 
 describe MetaEvents::Tracker do
   subject(:klass) { MetaEvents::Tracker }
@@ -77,7 +78,7 @@ describe MetaEvents::Tracker do
   describe "#initialize" do
     it "should validate its arguments" do
       expect { new_instance(@distinct_id, nil, :version => 1, :definitions => definition_set, :foo => :bar) }.to raise_error(ArgumentError, /foo/i)
-      expect { new_instance(@distinct_id, "whatever", :version => 1, :definitions => definition_set) }.to raise_error(IPAddr::InvalidAddressError)
+      expect { new_instance(@distinct_id, "whatever", :version => 1, :definitions => definition_set) }.to raise_error(ArgumentError)
       expect { new_instance(@distinct_id, /foobar/, :version => 1, :definitions => definition_set) }.to raise_error(ArgumentError, /foobar/i)
     end
 
@@ -436,6 +437,9 @@ EOS
 
   describe "#normalize_scalar_property_value" do
     it "should return the correct results for scalars" do
+      infinity = (1.0 / 0.0)
+      nan = (0.0 / 0.0)
+
       t = Time.parse("2008-09-04 3:46:12 PM -08:00")
       {
         nil => nil,
@@ -444,9 +448,9 @@ EOS
         3 => 3,
         42.5e+17 => 42.5e+17,
         3.months => 7776000,
-        Float::INFINITY => "+infinity",
-        Float::NAN => "NaN",
-        -Float::INFINITY => "-infinity",
+        infinity => "+infinity",
+        nan => "NaN",
+        -infinity => "-infinity",
         :foobar => 'foobar',
         :' FooBar  ' => 'FooBar',
         ' FooBar  ' => 'FooBar',

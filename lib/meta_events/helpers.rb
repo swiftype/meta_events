@@ -1,3 +1,5 @@
+require 'json'
+
 module MetaEvents
   # This module gets included as a Rails helper module, if Rails is available. It defines methods that are usable
   # by views to do tracking from the front-end -- both auto-tracking and frontend events.

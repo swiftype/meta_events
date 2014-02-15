@@ -464,6 +464,8 @@ module MetaEvents
         end
       end
 
+      FLOAT_INFINITY = (1.0 / 0.0)
+
       # Given a potential scalar value for a property, either returns the value that should actually be set in the
       # resulting set of properties (for example, converting Symbols to Strings) or returns +:invalid_property_value+
       # if that isn't a valid scalar value for a property.
@@ -473,9 +475,8 @@ module MetaEvents
         case value
         when true, false, nil then value
         when ActiveSupport::Duration then value.to_i
-        when Float::INFINITY then "+infinity"
-        when -Float::INFINITY then "-infinity"
-        when Float::NAN then "NaN"
+        when FLOAT_INFINITY then "+infinity"
+        when -FLOAT_INFINITY then "-infinity"
         when Numeric then value
         when String then value.strip
         when Symbol then value.to_s.strip
