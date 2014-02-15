@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Andrew Geweke"]
   spec.email         = ["ageweke@swiftype.com"]
   spec.summary       = %q{Structured, documented, powerful event emitting library for Mixpanel and other such systems.}
-  spec.homepage      = ""
+  spec.homepage      = "http://www.github.com/swiftype/meta_events"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")
