@@ -66,7 +66,20 @@ describe MetaEvents::Tracker do
     next_event = calls.shift
     expect(next_event[0]).to eq(expected_distinct_id)
     expect(next_event[1]).to eq(event_name)
-    expect(next_event[2]).to eq(event_properties)
+    actual_properties = next_event[2]
+
+    filtered_actual_properties = actual_properties.dup
+
+    # handle automatic properties that we may not want to care about every time
+    %w{ip time}.each do |automatic_property_name|
+      if ! event_properties.has_key?(automatic_property_name)
+        filtered_actual_properties.delete(automatic_property_name)
+      end
+    end
+
+    expect(filtered_actual_properties).to eq(event_properties)
+
+    actual_properties
   end
 
   def tep_object(props)
@@ -148,11 +161,38 @@ EOS
     end
   end
 
-  describe "#track_event" do
+  describe "#event!" do
     it "should allow firing a valid event" do
       i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
       i.event!(:foo, :bar, { })
       expect_event('xy1_foo_bar', { })
+    end
+
+    describe "time support" do
+      it "should add the time to the event" do
+        start_time = Time.now.to_i
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
+        i.event!(:foo, :bar, { })
+        end_time = Time.now.to_i
+        actual_properties = expect_event('xy1_foo_bar', { })
+        time = actual_properties['time']
+        expect(time).to be >= start_time
+        expect(time).to be >= end_time
+      end
+
+      it "should allow overriding the time" do
+        actual_time = Time.now.to_i - 500
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
+        i.event!(:foo, :bar, { :time => actual_time })
+        expect_event('xy1_foo_bar', { 'time' => actual_time })
+      end
+
+      it "should allow omitting the time" do
+        actual_time = Time.now.to_i - 500
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
+        i.event!(:foo, :bar, { :time => nil })
+        expect_event('xy1_foo_bar', { 'time' => nil })
+      end
     end
 
     describe "ip-address passing" do

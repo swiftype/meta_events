@@ -343,6 +343,7 @@ module MetaEvents
     # class.
     def event!(category_name, event_name, additional_properties = { })
       event_data = effective_properties(category_name, event_name, additional_properties)
+      event_data[:properties] = { 'time' => Time.now.to_i }.merge(event_data[:properties])
 
       self.event_receivers.each do |receiver|
         receiver.track(event_data[:distinct_id], event_data[:event_name], event_data[:properties])

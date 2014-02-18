@@ -558,6 +558,11 @@ Patches are welcome. ;-)
 
 ### Times
 
+MetaEvents automatically adds a `time` property to any event you fire via `#event!`; this is so that you can take the
+set of properties in a receiver and make it asynchronous, and don't have to worry about getting the time right. You
+can override this, however, by simply passing a `:time` property with your event; it will override any time we would
+otherwise set. (You can even set `:time => nil` if you want to make sure no time is passed at all.)
+
 MetaEvents correctly converts any `Time` object you pass into the correct String format for Mixpanel (_e.g._,
 `2014-02-03T15:49:17`), converting it to UTC first. This should make your times much cleaner.
 
