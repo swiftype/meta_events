@@ -90,8 +90,8 @@ uses this for doing geolocation of users:
 
     class ApplicationController < ActionController::Base
       ...
-      def event_tracker
-        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip)
+      def meta_events_tracker
+        @meta_events_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip)
       end
       ...
     end
@@ -102,7 +102,7 @@ Now, from the controller, we can fire an event and pass a couple of properties:
       ...
       def create
         ...
-        event_tracker.event!(:user, :signed_up, { :user_gender => @new_user.gender, :user_age => @new_user.age })
+        meta_events_tracker.event!(:user, :signed_up, { :user_gender => @new_user.gender, :user_age => @new_user.age })
         ...
       end
       ...
@@ -372,7 +372,7 @@ You could add these to every single call to `#event!`, but MetaEvents has a bett
 
     class ApplicationController < ActionController::Base
       ...
-      def event_tracker
+      def meta_events_tracker
         implicit_properties = { }
         if current_user
           implicit_properties.merge!(
@@ -380,8 +380,8 @@ You could add these to every single call to `#event!`, but MetaEvents has a bett
             :user_age => current_user.age
           )
         end
-        @event_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip,
-                                                   :implicit_properties => implicit_properties)
+        @meta_events_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip,
+                                                        :implicit_properties => implicit_properties)
       end
       ...
     end
@@ -398,7 +398,7 @@ properties that are defined on it. For example, imagine we have an event trigger
 another user. We have at least three entities: the 'from' user, the 'to' user, and the message itself. If we really
 want to instrument this event properly, we're going to want something like this:
 
-    event_tracker.event!(:user, :sent_message, {
+    meta_events_tracker.event!(:user, :sent_message, {
       :from_user_country => from_user.country,
       :from_user_state => from_user.state,
       :from_user_postcode => from_user.postcode,
@@ -462,7 +462,7 @@ automatically expanded and their names prefixed by the outer hash key. So let's 
 
 Now, we can pass the exact same set of properties as the above example, by simply doing:
 
-    event_tracker.event!(:user, :sent_message, {
+    meta_events_tracker.event!(:user, :sent_message, {
       :from_user => from_user.to_event_properties,
       :to_user => to_user.to_event_properties,
       :message => message.to_event_properties
@@ -476,7 +476,7 @@ And &mdash; tah-dah! &mdash; MetaEvents supports this syntax automatically. If y
 that object defines a method called `#to_event_properties`, then it will be called automatically, and replaced.
 Our code now looks like:
 
-    event_tracker.event!(:user, :sent_message, { :from_user => from_user, :to_user => to_user, :message => message })
+    meta_events_tracker.event!(:user, :sent_message, { :from_user => from_user, :to_user => to_user, :message => message })
 
 ### How to Take the Most Advantage
 
