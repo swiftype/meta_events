@@ -1,4 +1,4 @@
-Copyright (c) 2014 Andrew Geweke
+Copyright (c) 2014 Swiftype, Inc.
 
 MIT License
 

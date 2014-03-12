@@ -11,6 +11,8 @@ particularly dependent on exact Ruby versions, and should be compatible with a b
 
 Current build status: ![Current Build Status](https://api.travis-ci.org/swiftype/meta_events.png?branch=master)
 
+Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First version written by [Andrew Geweke](https://www.github.com/ageweke).
+
 ### Background
 
 Sending user-centric events to (_e.g._) Mixpanel is far from difficult; it's a single method call. However, in a
