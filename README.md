@@ -116,7 +116,7 @@ _event receivers_.
 ### Hooking Up Mixpanel and a Test Receiver
 
 An _event receiver_ is any object that responds to a method `#track(distinct_id, event_name, event_properties)`, where
-`distinct_id` is the distinct ID of the user, `event_name` is a `String` and `event_name` is a Hash mapping `String`
+`distinct_id` is the distinct ID of the user, `event_name` is a `String` and `event_properties` is a Hash mapping `String`
 property names to simple scalar values &mdash; `true`, `false`, `nil`, numbers (all `Numeric`s, including both
 integers and floating-point numbers, are supported), `String`s (and `Symbol`s will be converted to `String`s
 transparently), and `Time` objects.
