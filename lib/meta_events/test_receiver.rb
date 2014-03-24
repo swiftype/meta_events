@@ -9,7 +9,7 @@ module MetaEvents
   # This object is useful for watching and debugging events in development environments.
   class TestReceiver
     def initialize(target = nil, &block)
-      @target = target || block || ::Rails.logger
+      @target = target || block || lambda { |string| ::Rails.logger.info(string) }
     end
 
     def track(distinct_id, event_name, properties)
