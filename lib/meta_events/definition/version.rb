@@ -50,7 +50,7 @@ module MetaEvents
         instance_eval(&block) if block
       end
 
-      # Returns the prefix that all events in this version should have -- something like "st1", for example.
+      # Returns the prefix that all events in this version should have -- something like "pz1", for example.
       def prefix
         "#{definition_set.global_events_prefix}#{number}_"
       end
