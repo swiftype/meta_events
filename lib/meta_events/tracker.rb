@@ -264,7 +264,10 @@ module MetaEvents
       DEFAULT_EXTERNAL_NAME = lambda { |event| event.full_name }
 
       # The default value that new MetaEvents::Tracker instances will use to provide external names for events.
-      attr_writer :default_external_name
+      def default_external_name=(provider)
+        raise ArgumentError, "default_external_name must respond to #call" unless provider.respond_to? :call
+        @default_external_name = provider
+      end
 
       # If a default external name provider was not specified, use the built-in default.
       def default_external_name
@@ -346,6 +349,7 @@ module MetaEvents
       @definitions = ::MetaEvents::Definition::DefinitionSet.from(definitions)
       @version = options[:version] || self.class.default_version || raise(ArgumentError, "Must specify a :version")
       @external_name = options[:external_name] || self.class.default_external_name || raise(ArgumentError, "Must specify an :external_name")
+      raise ArgumentError, ":external_name option must respond to #call" unless @external_name.respond_to? :call
 
       @implicit_properties = { }
       self.class.merge_properties(@implicit_properties, { :ip => normalize_ip(ip).to_s }) if ip
