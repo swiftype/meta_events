@@ -110,7 +110,7 @@ module MetaEvents
   #
   # Once you have either of the above, you can set up your MetaEvents::Tracker with it in any of these ways:
   #
-  # * <tt>MetaEvents::Tracker.default_definitions = "path/to/myfile"</tt>;
+   # * <tt>MetaEvents::Tracker.default_definitions = "path/to/myfile"</tt>;
   # * <tt>MetaEvents::Tracker.default_definitions = my_definition_set</tt> -- both of these will set the definitions for
   #   any and all MetaEvents::Tracker instances that do not have definitions directly set on them;
   # * <tt>my_tracker = MetaEvents::Tracker.new(current_user.id, request.remote_ip, :definitions => "path/to/myfile")</tt>;
@@ -231,17 +231,29 @@ module MetaEvents
     cattr_accessor :default_event_receivers
     self.default_event_receivers = [ ]
 
-    # The set of event definitions from the MetaEvents DSL that MetaEvents::Tracker instances will use, by default (_i.e._, if not
-    # passed a separate definitions file using <tt>:definitions =></tt> in the constructor). You can set this to
-    # the pathname of a file containing event definitions, an +IO+ object containing the text of event definitions, or
-    # an ::MetaEvents::Definition::DefinitionSet object that you create any way you want.
-    #
-    # Reading +default_definitions+ always will return an instance of ::MetaEvents::Definition::DefinitionSet.
     class << self
+
+      # The set of event definitions from the MetaEvents DSL that MetaEvents::Tracker instances will use, by default (_i.e._, if not
+      # passed a separate definitions file using <tt>:definitions =></tt> in the constructor). You can set this to
+      # the pathname of a file containing event definitions, an +IO+ object containing the text of event definitions, or
+      # an ::MetaEvents::Definition::DefinitionSet object that you create any way you want.
+      #
+      # Reading +default_definitions+ always will return an instance of ::MetaEvents::Definition::DefinitionSet.
       def default_definitions=(source)
         @default_definitions = ::MetaEvents::Definition::DefinitionSet.from(source)
       end
       attr_reader :default_definitions
+
+      # The built-in default calculation of an external event name, which is the event's <tt>:full_name</tt>
+      DEFAULT_EXTERNAL_NAME = lambda { |event| event.full_name }
+
+      # The default value that new MetaEvents::Tracker instances will use to provide external names for events.
+      attr_writer :default_external_name
+
+      # If a default external name provider was not specified, use the built-in default.
+      def default_external_name
+        @default_external_name || DEFAULT_EXTERNAL_NAME
+      end
     end
 
     # The default version that new MetaEvents::Tracker instances will use to look up events in the MetaEvents DSL.
@@ -259,6 +271,9 @@ module MetaEvents
 
     # The version of events that this Tracker is using.
     attr_reader :version
+
+    # A method that provides the external name for an event.
+    attr_reader :external_name
 
     # Creates a new instance.
     #
@@ -298,7 +313,7 @@ module MetaEvents
     #                        (#to_event_properties) documented above. Any properties explicitly passed with an event
     #                        that have the same name as these properties will override these properties for that event.
     def initialize(distinct_id, ip, options = { })
-      options.assert_valid_keys(:definitions, :version, :implicit_properties, :event_receivers)
+      options.assert_valid_keys(:definitions, :version, :external_name, :implicit_properties, :event_receivers)
 
       definitions = options[:definitions] || self.class.default_definitions
       unless definitions
@@ -311,6 +326,7 @@ module MetaEvents
 
       @definitions = ::MetaEvents::Definition::DefinitionSet.from(definitions)
       @version = options[:version] || self.class.default_version || raise(ArgumentError, "Must specify a :version")
+      @external_name = options[:external_name] || self.class.default_external_name || raise(ArgumentError, "Must specify an :external_name")
 
       @implicit_properties = { }
       self.class.merge_properties(@implicit_properties, { :ip => normalize_ip(ip).to_s }) if ip
@@ -355,8 +371,9 @@ module MetaEvents
     #
     # [:distinct_id] The +distinct_id+ that should be passed with the event; this can be +nil+ if there is no distinct
     #                ID being passed.
-    # [:event_name]  The fully-qualified event name, including +global_events_prefix+ and version number, exactly as
-    #                it should be passed to an events backend.
+    # [:event_name]  If a filter was performed, the result of the filtered event name. By default, the fully-qualified
+    #                event name, including +global_events_prefix+ and version number, exactly as it should be passed to
+    #                an events backend.
     # [:properties]  The full set of properties, expanded (so values will only be scalars, never Hashes or objects),
     #                with String keys, exactly as they should be passed to an events system.
     #
@@ -376,9 +393,14 @@ module MetaEvents
       # We need to do this instead of just using || so that you can override a present distinct_id with nil.
       net_distinct_id = if properties.has_key?('distinct_id') then properties.delete('distinct_id') else self.distinct_id end
 
+      # Attempt to retrieve the external name of the event, and if none was provided
+      # fall back to the full name of the event.
+      full_event_name = external_name.call(event) || event.full_name
+      raise TypeError, "The external name of an event must be a String" unless full_event_name.kind_of?(String)
+
       {
         :distinct_id => net_distinct_id,
-        :event_name  => event.full_name,
+        :event_name  => full_event_name,
         :properties  => properties
       }
     end

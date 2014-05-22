@@ -299,11 +299,60 @@ EOS
     end
 
     it "should pick up the default version from the class" do
-      klass.default_version = 2
+      original_default_version = klass.default_version
 
-      i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
-      i.event!(:foo, :quux)
-      expect_event("xy2_foo_quux", { })
+      begin
+        klass.default_version = 2
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :quux)
+        expect_event("xy2_foo_quux", { })
+      ensure
+        klass.default_version = original_default_version
+      end
+    end
+
+    it "should use the default external name from the class" do
+      begin
+        klass.default_external_name = lambda { |event| "#{event.category_name}-super-custom-#{event.name}" }
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :bar, { })
+        expect_event('foo-super-custom-bar', { })
+      ensure
+        klass.default_external_name = nil
+      end
+    end
+
+    it "should allow resetting the default external name from the class back to the built-in default" do
+      begin
+        klass.default_external_name = lambda { |event| "#{event.category_name}-super-custom-#{event.name}" }
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :bar, { })
+        expect_event('foo-super-custom-bar', { })
+
+        klass.default_external_name = nil
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :bar, { })
+        expect_event('xy1_foo_bar', { })
+      ensure
+        klass.default_external_name = nil
+      end
+    end
+
+    it "should allow overriding the external name in the constructor" do
+      i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| "#{event.category_name}-super-custom-#{event.name}" })
+      i.event!(:foo, :bar, { })
+      expect_event('foo-super-custom-bar', { })
+    end
+
+    it "should require the result of the external name to be a string" do
+      expect {
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| 1234 })
+        i.event!(:foo, :bar, { })
+      }.to raise_error(TypeError, /external name/i)
     end
 
     it "should allow firing a valid event, and include implicit properties" do
