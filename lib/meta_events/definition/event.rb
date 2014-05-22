@@ -89,14 +89,21 @@ module MetaEvents
         @introduced
       end
 
+      # Returns, or sets, an overridden external_name to use for an event.
+      def external_name(name = nil)
+        @external_name = name if name
+        @external_name
+      end
+
       # Returns the name of the category for an event.
       def category_name
         category.name
       end
 
       # Returns the full name of an event, including all prefixes.
+      # If a custom external name was specified, returns #external_name instead.
       def full_name
-        "#{category.prefix}#{name}"
+        @external_name || "#{category.prefix}#{name}"
       end
 
       # Returns the time at which this event has been retired, if any -- this is the earliest time from its category
@@ -139,12 +146,12 @@ module MetaEvents
       # Called with the set of options (which can be empty) supplied in the constructor; responsible for applying those
       # to the object properly.
       def apply_options!(options)
-        options.assert_valid_keys(:introduced, :desc, :description, :retired_at)
+        options.assert_valid_keys(:introduced, :desc, :description, :retired_at, :external_name)
 
         introduced options[:introduced] if options[:introduced]
         desc options[:desc] if options[:desc]
         desc options[:description] if options[:description]
-
+        external_name options[:external_name] if options[:external_name]
 
         @retired_at = Time.parse(options[:retired_at]) if options[:retired_at]
       end
