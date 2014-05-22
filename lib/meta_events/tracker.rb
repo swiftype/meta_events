@@ -265,7 +265,9 @@ module MetaEvents
 
       # The default value that new MetaEvents::Tracker instances will use to provide external names for events.
       def default_external_name=(provider)
-        raise ArgumentError, "default_external_name must respond to #call" unless provider.respond_to? :call
+        if provider && !provider.respond_to?(:call)
+          raise ArgumentError, "default_external_name must respond to #call"
+        end
         @default_external_name = provider
       end
 
