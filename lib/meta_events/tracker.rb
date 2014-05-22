@@ -110,7 +110,7 @@ module MetaEvents
   #
   # Once you have either of the above, you can set up your MetaEvents::Tracker with it in any of these ways:
   #
-   # * <tt>MetaEvents::Tracker.default_definitions = "path/to/myfile"</tt>;
+  # * <tt>MetaEvents::Tracker.default_definitions = "path/to/myfile"</tt>;
   # * <tt>MetaEvents::Tracker.default_definitions = my_definition_set</tt> -- both of these will set the definitions for
   #   any and all MetaEvents::Tracker instances that do not have definitions directly set on them;
   # * <tt>my_tracker = MetaEvents::Tracker.new(current_user.id, request.remote_ip, :definitions => "path/to/myfile")</tt>;
@@ -219,6 +219,22 @@ module MetaEvents
   #
   # We recommend that you keep the global events prefix short, simply because tools like Mixpanel often have a
   # relatively small amount of screen real estate available for event names.
+  #
+  # ### Overriding Event Names
+  #
+  # There might be a situation where users performing analysis desire a friendlier name than the default.
+  # The external name can be customized with a lambda (or any object that responds to <tt>#call(event)</tt>).
+  # To customize the external name for all MetaEvents::Tracker instances, 
+  # specify <tt>MetaEvents::Tracker.default_external_name = lambda { |event| "custom event name" }</tt>.
+  # 
+  # To customize the external name for a specific MetaEvents::Tracker instance, pass the lambda 
+  # in the constructor, for example:
+  # <tt>MetaEvents::Tracker.new(current_user.id, request.remote_ip, :external_name => lambda {|e| "#{e.full_name}_CUSTOM" })</tt>
+  #
+  # To reset default behavior back to the built-in default, simply set <tt>MetaEvents::Tracker.default_external_name = nil</tt>
+  #
+  # The event passed to external_name is an instance of ::MetaEvents::Definition::Event
+  #
   class Tracker
     class EventError < StandardError; end
     class PropertyCollisionError < EventError; end
@@ -312,6 +328,9 @@ module MetaEvents
     #                        with every event fired from this Tracker. This can use the hash-merge and object syntax
     #                        (#to_event_properties) documented above. Any properties explicitly passed with an event
     #                        that have the same name as these properties will override these properties for that event.
+    # [:external_name] If present, this should be a lambda that takes a single argument and returns a string, or an 
+    #                  object that responds to call(event). If +:external_name+ is not provided, it will use the
+    #                  default configured for the MetaEvents::Tracker class.
     def initialize(distinct_id, ip, options = { })
       options.assert_valid_keys(:definitions, :version, :external_name, :implicit_properties, :event_receivers)
 
