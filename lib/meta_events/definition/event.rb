@@ -89,7 +89,7 @@ module MetaEvents
         @introduced
       end
 
-      # Returns, or sets, an overridden external_name to use for an event.
+      # Returns, or sets, an external_name to use for an event.
       def external_name(name = nil)
         @external_name = name if name
         @external_name
@@ -100,10 +100,9 @@ module MetaEvents
         category.name
       end
 
-      # Returns the full name of an event, including all prefixes.
-      # If a custom external name was specified, returns #external_name instead.
+      # Returns the canonical full name of an event, including all prefixes.
       def full_name
-        @external_name || "#{category.prefix}#{name}"
+        "#{category.prefix}#{name}"
       end
 
       # Returns the time at which this event has been retired, if any -- this is the earliest time from its category

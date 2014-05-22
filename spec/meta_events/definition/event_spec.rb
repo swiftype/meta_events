@@ -156,11 +156,6 @@ describe ::MetaEvents::Definition::Event do
         instance.external_name "my name"
         expect(instance.external_name).to eq("my name")
       end
-
-      it "should return the custom external name for the full name" do
-        instance.external_name "customized event name"
-        expect(instance.full_name).to eq("customized event name")
-      end
     end
   end
 end

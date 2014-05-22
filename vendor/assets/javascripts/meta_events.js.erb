@@ -92,7 +92,7 @@ MetaEvents = (function() {
    *
    * @param name - The name that we'll use to access this event, using 'event', below; this is different from the name
    *               of the actual event that will be fired and need not have any correlation;
-   * @param eventData - The data for the event; this must be an object containing 'event_name', which is the name of
+   * @param eventData - The data for the event; this must be an object containing 'external_name', which is the name of
    *                    the event to fire, and 'properties', the set of properties to fire with that event.
    */
   out.registerFrontendEvent = function(name, eventData) {
@@ -128,14 +128,15 @@ MetaEvents = (function() {
       $.extend(effectiveProperties, arguments[i]);
     }
 
-    this.eventHandler(eventData.event_name, effectiveProperties);
+    var external_name = eventData.external_name || eventData.event_name;
+    this.eventHandler(external_name, effectiveProperties);
   };
 
   /**
    * The default event handler that we use if you haven't called setEventHandler(), below.
    */
-  out.mixpanelEventHandler = function(eventName, properties) {
-    mixpanel.track(eventName, properties);
+  out.mixpanelEventHandler = function(externalName, properties) {
+    mixpanel.track(externalName, properties);
   };
 
   /**

@@ -8,7 +8,7 @@ describe MetaEvents::Tracker do
       version 1, '2014-01-31' do
         category :foo do
           event :bar, '2014-01-31', 'this is bar'
-          event :baz, '2014-01-31', 'this is baz'
+          event :baz, '2014-01-31', 'this is baz', :external_name => 'foo bazzeroo'
           event :nolonger, '2014-01-31', 'should be retired', :retired_at => '2020-01-01'
         end
       end
@@ -355,6 +355,38 @@ EOS
       }.to raise_error(TypeError, /external name/i)
     end
 
+    context "with default_external_name set" do
+      before :each do
+        klass.default_external_name = lambda { |event| "default-#{event.category_name}-#{event.name}-custom" }
+      end
+
+      after :each do
+        klass.default_external_name = nil
+      end
+
+      it "should return event external_name if set" do
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| "#{event.category_name}-#{event.name}-custom" })
+        i.event!(:foo, :baz, { })
+        expect_event('foo bazzeroo', { })
+      end
+
+      context "no event external_name is set" do
+        it "should return instance external_name" do
+          i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| "#{event.category_name}-#{event.name}-custom" })
+          i.event!(:foo, :bar, { })
+          expect_event('foo-bar-custom', { })
+        end
+
+        context "no instance external_name is set" do
+          it "should return default_external_name" do
+            i = new_instance(@distinct_id, nil, :definitions => definition_set)
+            i.event!(:foo, :bar, { })
+            expect_event('default-foo-bar-custom', { })
+          end
+        end
+      end
+    end
+
     it "should allow firing a valid event, and include implicit properties" do
       @instance.event!(:foo, :bar, { })
       expect_event('xy1_foo_bar', { 'user_name' => 'wilfred', 'user_hometown' => 'Fridley' })
@@ -462,7 +494,7 @@ EOS
     end
 
     it "should include no additional keys" do
-      expect(@instance.effective_properties(:foo, :bar).keys.sort_by(&:to_s)).to eq(%w{distinct_id event_name properties}.map(&:to_sym).sort_by(&:to_s))
+      expect(@instance.effective_properties(:foo, :bar).keys.sort_by(&:to_s)).to eq(%w{distinct_id event_name external_name properties}.map(&:to_sym).sort_by(&:to_s))
     end
   end
 

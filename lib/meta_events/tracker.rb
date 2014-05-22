@@ -387,20 +387,20 @@ module MetaEvents
       event_data[:properties] = { 'time' => Time.now.to_i }.merge(event_data[:properties])
 
       self.event_receivers.each do |receiver|
-        receiver.track(event_data[:distinct_id], event_data[:event_name], event_data[:properties])
+        receiver.track(event_data[:distinct_id], event_data[:external_name], event_data[:properties])
       end
     end
 
     # Given a category, an event, and (optionally) additional properties, performs all of the expansion and validation
     # of #event!, but does not actually fire the event -- rather, returns a Hash containing:
     #
-    # [:distinct_id] The +distinct_id+ that should be passed with the event; this can be +nil+ if there is no distinct
-    #                ID being passed.
-    # [:event_name]  If a filter was performed, the result of the filtered event name. By default, the fully-qualified
-    #                event name, including +global_events_prefix+ and version number, exactly as it should be passed to
-    #                an events backend.
-    # [:properties]  The full set of properties, expanded (so values will only be scalars, never Hashes or objects),
-    #                with String keys, exactly as they should be passed to an events system.
+    # [:distinct_id]   The +distinct_id+ that should be passed with the event; this can be +nil+ if there is no distinct
+    #                  ID being passed.
+    # [:event_name]    The fully-qualified event name, including +global_events_prefix+ and version number.
+    # [:external_name] The event name for use in an events backend.
+    #                  By default this is +:event_name+ but can be overridden.
+    # [:properties]    The full set of properties, expanded (so values will only be scalars, never Hashes or objects),
+    #                  with String keys, exactly as they should be passed to an events system.
     #
     # This method can be used for many things, but its primary purpose is to support front-end (Javascript-fired)
     # events: you can have it compute exactly the set of properties that should be attached to such events, embed
@@ -418,15 +418,14 @@ module MetaEvents
       # We need to do this instead of just using || so that you can override a present distinct_id with nil.
       net_distinct_id = if properties.has_key?('distinct_id') then properties.delete('distinct_id') else self.distinct_id end
 
-      # Attempt to retrieve the external name of the event, and if none was provided
-      # fall back to the full name of the event.
-      full_event_name = external_name.call(event) || event.full_name
-      raise TypeError, "The external name of an event must be a String" unless full_event_name.kind_of?(String)
+      event_external_name = event.external_name || external_name.call(event)
+      raise TypeError, "The external name of an event must be a String" unless event_external_name.kind_of?(String)
 
       {
-        :distinct_id => net_distinct_id,
-        :event_name  => full_event_name,
-        :properties  => properties
+        :distinct_id   => net_distinct_id,
+        :event_name    => event.full_name,
+        :external_name => event_external_name,
+        :properties    => properties
       }
     end
 

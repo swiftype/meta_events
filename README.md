@@ -619,8 +619,8 @@ Finally, you can override each event's external name in the events DSL:
       end
     end
 
-The order of precedence for determining the external event name is `MetaEvents::Tracker.new`, 
-`MetaEvents::Tracker.default_external_name`, DSL `event :external_name => 'foo'`, built-in default.
+The order of precedence for determining the external event name is the DSL's `event :external_name => 'foo'`,
+`MetaEvents::Tracker.new`, `MetaEvents::Tracker.default_external_name`, built-in default.
 
 ## Contributing
 
