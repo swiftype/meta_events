@@ -51,7 +51,11 @@ describe MetaEvents::ControllerMethods do
   end
 
   describe "frontend-event registration" do
-    def expect_defined_event(name, event_name, external_name, properties, options = { })
+    def expect_defined_event(name, external_name, properties, options = { })
+      expect_defined_event_with_event_name(name, external_name, external_name, properties, options)
+    end
+
+    def expect_defined_event_with_event_name(name, external_name, event_name, properties, options = { })
       expected_distinct_id = options[:distinct_id] || 'abc123'
       expect(@obj.meta_events_defined_frontend_events[name]).to eq({
         :distinct_id => expected_distinct_id,
@@ -79,7 +83,7 @@ describe MetaEvents::ControllerMethods do
 
     it "should let you alias the event to anything you want" do
       @obj.meta_events_define_frontend_event(:foo, :bar, { :aaa => 'bbb' }, :name => 'zyxwvu')
-      expect_defined_event('zyxwvu', 'xy1_foo_bar', 'xy1_foo_bar', { 'imp1' => 'imp1val1', 'aaa' => 'bbb' })
+      expect_defined_event('zyxwvu', 'xy1_foo_bar', { 'imp1' => 'imp1val1', 'aaa' => 'bbb' })
     end
 
     it "should let you override the tracker if you want" do
@@ -93,17 +97,17 @@ describe MetaEvents::ControllerMethods do
       t2 = ::MetaEvents::Tracker.new("def345", nil, :definitions => ds2, :version => 2)
 
       @obj.meta_events_define_frontend_event(:aaa, :bbb, { }, :tracker => t2)
-      expect_defined_event('aaa_bbb', 'ab2_aaa_bbb', 'ab2_aaa_bbb', { }, { :distinct_id => 'def345' })
+      expect_defined_event('aaa_bbb', 'ab2_aaa_bbb', { }, { :distinct_id => 'def345' })
     end
 
     it "should let you overwrite implicit properties and do hash expansion" do
       @obj.meta_events_define_frontend_event(:foo, :bar, { :imp1 => 'imp1val2', :a => { :b => 'c', :d => 'e' } })
-      expect_defined_event('foo_bar', 'xy1_foo_bar', 'xy1_foo_bar', { 'imp1' => 'imp1val2', 'a_b' => 'c', 'a_d' => 'e' })
+      expect_defined_event('foo_bar', 'xy1_foo_bar', { 'imp1' => 'imp1val2', 'a_b' => 'c', 'a_d' => 'e' })
     end
 
     it "should use an overridden external_name" do
       @obj.meta_events_define_frontend_event(:foo, :custom, { :imp1 => 'imp1val1' })
-      expect_defined_event('foo_custom', 'xy1_foo_custom', 'super-amazing-custom', { 'imp1' => 'imp1val1' })
+      expect_defined_event_with_event_name('foo_custom', 'super-amazing-custom', 'xy1_foo_custom', { 'imp1' => 'imp1val1' })
     end
 
     context "with one simple defined event" do
@@ -113,12 +117,12 @@ describe MetaEvents::ControllerMethods do
 
       it "should output that event (only) in the JavaScript and via meta_events_define_frontend_event" do
         expect(@obj.meta_events_defined_frontend_events.keys).to eq(%w{foo_bar})
-        expect_defined_event('foo_bar', 'xy1_foo_bar', 'xy1_foo_bar', { 'quux' => 123, 'imp1' => 'imp1val1' })
+        expect_defined_event('foo_bar', 'xy1_foo_bar', { 'quux' => 123, 'imp1' => 'imp1val1' })
       end
 
       it "should overwrite the event if a new one is registered" do
         @obj.meta_events_define_frontend_event(:foo, :baz, { :marph => 345 }, :name => 'foo_bar')
-        expect_defined_event('foo_bar', 'xy1_foo_baz', 'xy1_foo_baz', { 'marph' => 345, 'imp1' => 'imp1val1' })
+        expect_defined_event('foo_bar', 'xy1_foo_baz', { 'marph' => 345, 'imp1' => 'imp1val1' })
       end
     end
 
@@ -131,9 +135,9 @@ describe MetaEvents::ControllerMethods do
 
       it "should output all the events in the JavaScript and via meta_events_define_frontend_event" do
         expect(@obj.meta_events_defined_frontend_events.keys.sort).to eq(%w{foo_bar foo_baz voodoo}.sort)
-        expect_defined_event('foo_bar', 'xy1_foo_bar', 'xy1_foo_bar', { 'quux' => 123, 'imp1' => 'imp1val1' })
-        expect_defined_event('voodoo', 'xy1_foo_bar', 'xy1_foo_bar', { 'quux' => 345, 'imp1' => 'imp1val1' })
-        expect_defined_event('foo_baz', 'xy1_foo_baz', 'xy1_foo_baz', { 'marph' => 'whatever', 'imp1' => 'imp1val1' })
+        expect_defined_event('foo_bar', 'xy1_foo_bar', { 'quux' => 123, 'imp1' => 'imp1val1' })
+        expect_defined_event('voodoo', 'xy1_foo_bar', { 'quux' => 345, 'imp1' => 'imp1val1' })
+        expect_defined_event('foo_baz', 'xy1_foo_baz', { 'marph' => 'whatever', 'imp1' => 'imp1val1' })
       end
     end
   end
