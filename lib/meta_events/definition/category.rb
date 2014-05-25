@@ -1,5 +1,6 @@
 require "meta_events"
 require "meta_events/definition/event"
+require "active_support"
 require "active_support/core_ext"
 
 module MetaEvents
