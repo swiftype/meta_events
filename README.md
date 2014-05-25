@@ -589,6 +589,39 @@ it is difficult or impossible to know if true underlying usage, etc., _actually_
 of changing events.) You can simply create two `MetaEvents::Tracker` instances, one for each version, and use them
 in parallel.
 
+### Customizing the Event Name
+
+Developers love names like "xyz1_user_signed_up" but sometimes it's not a developer doing the analysis.
+Depending on what the back-end analytics library supports, event names in external systems are frequently not 
+given a lot of real estate.
+
+In cases like these, you can override the default external event name behavior. There are three ways to 
+override these external names.
+
+First, you can override them globally for all `MetaEvents::Tracker` instances:
+
+    MetaEvents::Tracker.default_external_name = lambda { |event| "#{event.category_name} #{event.name}" }
+
+Second, you can override them for a specific `MetaEvents::Tracker` instance:
+
+    MetaEvents::Tracker.new(current_user.try(:id), 
+                        request.remote_ip, 
+                        :external_name => lambda { |event| "#{event.category_name} #{event.name}" }
+                       )
+
+Finally, you can override each event's external name in the events DSL:
+
+    global_events_prefix :ab
+
+    version 1, "2014-02-11" do
+      category :example_category do
+        event :example_event, "2014-02-11", "Example was exampled!", :external_name => 'ex. was ex.'
+      end
+    end
+
+The order of precedence for determining the external event name is the DSL's `event :external_name => 'foo'`,
+`MetaEvents::Tracker.new`, `MetaEvents::Tracker.default_external_name`, built-in default.
+
 ## Contributing
 
 1. Fork it ( http://github.com/swiftype/meta_events/fork )

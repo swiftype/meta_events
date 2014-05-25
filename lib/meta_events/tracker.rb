@@ -219,6 +219,22 @@ module MetaEvents
   #
   # We recommend that you keep the global events prefix short, simply because tools like Mixpanel often have a
   # relatively small amount of screen real estate available for event names.
+  #
+  # ### Overriding Event Names
+  #
+  # There might be a situation where users performing analysis desire a friendlier name than the default.
+  # The external name can be customized with a lambda (or any object that responds to <tt>#call(event)</tt>).
+  # To customize the external name for all MetaEvents::Tracker instances, 
+  # specify <tt>MetaEvents::Tracker.default_external_name = lambda { |event| "custom event name" }</tt>.
+  # 
+  # To customize the external name for a specific MetaEvents::Tracker instance, pass the lambda 
+  # in the constructor, for example:
+  # <tt>MetaEvents::Tracker.new(current_user.id, request.remote_ip, :external_name => lambda {|e| "#{e.full_name}_CUSTOM" })</tt>
+  #
+  # To reset default behavior back to the built-in default, simply set <tt>MetaEvents::Tracker.default_external_name = nil</tt>
+  #
+  # The event passed to external_name is an instance of ::MetaEvents::Definition::Event
+  #
   class Tracker
     class EventError < StandardError; end
     class PropertyCollisionError < EventError; end
@@ -231,17 +247,34 @@ module MetaEvents
     cattr_accessor :default_event_receivers
     self.default_event_receivers = [ ]
 
-    # The set of event definitions from the MetaEvents DSL that MetaEvents::Tracker instances will use, by default (_i.e._, if not
-    # passed a separate definitions file using <tt>:definitions =></tt> in the constructor). You can set this to
-    # the pathname of a file containing event definitions, an +IO+ object containing the text of event definitions, or
-    # an ::MetaEvents::Definition::DefinitionSet object that you create any way you want.
-    #
-    # Reading +default_definitions+ always will return an instance of ::MetaEvents::Definition::DefinitionSet.
     class << self
+
+      # The set of event definitions from the MetaEvents DSL that MetaEvents::Tracker instances will use, by default (_i.e._, if not
+      # passed a separate definitions file using <tt>:definitions =></tt> in the constructor). You can set this to
+      # the pathname of a file containing event definitions, an +IO+ object containing the text of event definitions, or
+      # an ::MetaEvents::Definition::DefinitionSet object that you create any way you want.
+      #
+      # Reading +default_definitions+ always will return an instance of ::MetaEvents::Definition::DefinitionSet.
       def default_definitions=(source)
         @default_definitions = ::MetaEvents::Definition::DefinitionSet.from(source)
       end
       attr_reader :default_definitions
+
+      # The built-in default calculation of an external event name, which is the event's <tt>:full_name</tt>
+      DEFAULT_EXTERNAL_NAME = lambda { |event| event.full_name }
+
+      # The default value that new MetaEvents::Tracker instances will use to provide external names for events.
+      def default_external_name=(provider)
+        if provider && !provider.respond_to?(:call)
+          raise ArgumentError, "default_external_name must respond to #call"
+        end
+        @default_external_name = provider
+      end
+
+      # If a default external name provider was not specified, use the built-in default.
+      def default_external_name
+        @default_external_name || DEFAULT_EXTERNAL_NAME
+      end
     end
 
     # The default version that new MetaEvents::Tracker instances will use to look up events in the MetaEvents DSL.
@@ -259,6 +292,9 @@ module MetaEvents
 
     # The version of events that this Tracker is using.
     attr_reader :version
+
+    # A method that provides the external name for an event.
+    attr_reader :external_name
 
     # Creates a new instance.
     #
@@ -297,8 +333,11 @@ module MetaEvents
     #                        with every event fired from this Tracker. This can use the hash-merge and object syntax
     #                        (#to_event_properties) documented above. Any properties explicitly passed with an event
     #                        that have the same name as these properties will override these properties for that event.
+    # [:external_name] If present, this should be a lambda that takes a single argument and returns a string, or an 
+    #                  object that responds to call(event). If +:external_name+ is not provided, it will use the
+    #                  default configured for the MetaEvents::Tracker class.
     def initialize(distinct_id, ip, options = { })
-      options.assert_valid_keys(:definitions, :version, :implicit_properties, :event_receivers)
+      options.assert_valid_keys(:definitions, :version, :external_name, :implicit_properties, :event_receivers)
 
       definitions = options[:definitions] || self.class.default_definitions
       unless definitions
@@ -311,6 +350,8 @@ module MetaEvents
 
       @definitions = ::MetaEvents::Definition::DefinitionSet.from(definitions)
       @version = options[:version] || self.class.default_version || raise(ArgumentError, "Must specify a :version")
+      @external_name = options[:external_name] || self.class.default_external_name || raise(ArgumentError, "Must specify an :external_name")
+      raise ArgumentError, ":external_name option must respond to #call" unless @external_name.respond_to? :call
 
       @implicit_properties = { }
       self.class.merge_properties(@implicit_properties, { :ip => normalize_ip(ip).to_s }) if ip
@@ -346,19 +387,20 @@ module MetaEvents
       event_data[:properties] = { 'time' => Time.now.to_i }.merge(event_data[:properties])
 
       self.event_receivers.each do |receiver|
-        receiver.track(event_data[:distinct_id], event_data[:event_name], event_data[:properties])
+        receiver.track(event_data[:distinct_id], event_data[:external_name], event_data[:properties])
       end
     end
 
     # Given a category, an event, and (optionally) additional properties, performs all of the expansion and validation
     # of #event!, but does not actually fire the event -- rather, returns a Hash containing:
     #
-    # [:distinct_id] The +distinct_id+ that should be passed with the event; this can be +nil+ if there is no distinct
-    #                ID being passed.
-    # [:event_name]  The fully-qualified event name, including +global_events_prefix+ and version number, exactly as
-    #                it should be passed to an events backend.
-    # [:properties]  The full set of properties, expanded (so values will only be scalars, never Hashes or objects),
-    #                with String keys, exactly as they should be passed to an events system.
+    # [:distinct_id]   The +distinct_id+ that should be passed with the event; this can be +nil+ if there is no distinct
+    #                  ID being passed.
+    # [:event_name]    The fully-qualified event name, including +global_events_prefix+ and version number.
+    # [:external_name] The event name for use in an events backend.
+    #                  By default this is +:event_name+ but can be overridden.
+    # [:properties]    The full set of properties, expanded (so values will only be scalars, never Hashes or objects),
+    #                  with String keys, exactly as they should be passed to an events system.
     #
     # This method can be used for many things, but its primary purpose is to support front-end (Javascript-fired)
     # events: you can have it compute exactly the set of properties that should be attached to such events, embed
@@ -376,10 +418,14 @@ module MetaEvents
       # We need to do this instead of just using || so that you can override a present distinct_id with nil.
       net_distinct_id = if properties.has_key?('distinct_id') then properties.delete('distinct_id') else self.distinct_id end
 
+      event_external_name = event.external_name || external_name.call(event)
+      raise TypeError, "The external name of an event must be a String" unless event_external_name.kind_of?(String)
+
       {
-        :distinct_id => net_distinct_id,
-        :event_name  => event.full_name,
-        :properties  => properties
+        :distinct_id   => net_distinct_id,
+        :event_name    => event.full_name,
+        :external_name => event_external_name,
+        :properties    => properties
       }
     end
 

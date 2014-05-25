@@ -7,6 +7,7 @@ describe MetaEvents::ControllerMethods do
         category :foo do
           event :bar, '2014-01-31', 'this is bar'
           event :baz, '2014-01-31', 'this is baz'
+          event :custom, '2014-01-31', 'this is quux', :external_name => 'super-amazing-custom'
         end
       end
     end
@@ -50,11 +51,16 @@ describe MetaEvents::ControllerMethods do
   end
 
   describe "frontend-event registration" do
-    def expect_defined_event(name, event_name, properties, options = { })
+    def expect_defined_event(name, external_name, properties, options = { })
+      expect_defined_event_with_event_name(name, external_name, external_name, properties, options)
+    end
+
+    def expect_defined_event_with_event_name(name, external_name, event_name, properties, options = { })
       expected_distinct_id = options[:distinct_id] || 'abc123'
       expect(@obj.meta_events_defined_frontend_events[name]).to eq({
         :distinct_id => expected_distinct_id,
         :event_name => event_name,
+        :external_name => external_name,
         :properties => properties
       })
 
@@ -63,7 +69,7 @@ describe MetaEvents::ControllerMethods do
       js =~ /["']#{name}["']\s*,\s*(.*?)\s*\)\s*\;/i
       matched = $1
       hash = JSON.parse($1)
-      expect(hash).to eq('distinct_id' => expected_distinct_id, 'event_name' => event_name, 'properties' => properties)
+      expect(hash).to eq('distinct_id' => expected_distinct_id, 'event_name' => event_name, 'external_name' => external_name, 'properties' => properties)
     end
 
     it "should work fine if there are no registered events" do
@@ -97,6 +103,11 @@ describe MetaEvents::ControllerMethods do
     it "should let you overwrite implicit properties and do hash expansion" do
       @obj.meta_events_define_frontend_event(:foo, :bar, { :imp1 => 'imp1val2', :a => { :b => 'c', :d => 'e' } })
       expect_defined_event('foo_bar', 'xy1_foo_bar', { 'imp1' => 'imp1val2', 'a_b' => 'c', 'a_d' => 'e' })
+    end
+
+    it "should use an overridden external_name" do
+      @obj.meta_events_define_frontend_event(:foo, :custom, { :imp1 => 'imp1val1' })
+      expect_defined_event_with_event_name('foo_custom', 'super-amazing-custom', 'xy1_foo_custom', { 'imp1' => 'imp1val1' })
     end
 
     context "with one simple defined event" do

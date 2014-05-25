@@ -52,6 +52,11 @@ describe ::MetaEvents::Definition::Event do
     expect(klass.new(category, :foo, "2014-01-01") { desc 'foobar' }.desc).to eq("foobar")
   end
 
+  it "should let you set external_name via both mechanisms" do
+    expect(klass.new(category, :foo, "2014-01-01", "foobar", :external_name => "custom external name").external_name).to eq("custom external name")
+    expect(klass.new(category, :foo, "2014-01-01", "foobar") { external_name "custom external name" }.external_name).to eq("custom external name")
+  end
+
   context "with an instance" do
     let(:instance) { klass.new(category, :foo, "2014-01-01", "foobar") }
 
@@ -141,6 +146,16 @@ describe ::MetaEvents::Definition::Event do
       expect(note_2[:when_left]).to eq(Time.parse("2013-02-27"))
       expect(note_2[:who]).to eq("someone else")
       expect(note_2[:text]).to eq("whatever")
+    end
+
+    context "with a custom external name" do
+      let(:instance) { klass.new(category, :foo, "2014-01-01", "foobar", :external_name => "custom external name") }
+
+      it "should return and allow setting its external name via #external_name" do
+        expect(instance.external_name).to eq("custom external name")
+        instance.external_name "my name"
+        expect(instance.external_name).to eq("my name")
+      end
     end
   end
 end

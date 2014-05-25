@@ -8,7 +8,7 @@ describe MetaEvents::Tracker do
       version 1, '2014-01-31' do
         category :foo do
           event :bar, '2014-01-31', 'this is bar'
-          event :baz, '2014-01-31', 'this is baz'
+          event :baz, '2014-01-31', 'this is baz', :external_name => 'foo bazzeroo'
           event :nolonger, '2014-01-31', 'should be retired', :retired_at => '2020-01-01'
         end
       end
@@ -299,11 +299,92 @@ EOS
     end
 
     it "should pick up the default version from the class" do
-      klass.default_version = 2
+      original_default_version = klass.default_version
 
-      i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
-      i.event!(:foo, :quux)
-      expect_event("xy2_foo_quux", { })
+      begin
+        klass.default_version = 2
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :quux)
+        expect_event("xy2_foo_quux", { })
+      ensure
+        klass.default_version = original_default_version
+      end
+    end
+
+    it "should use the default external name from the class" do
+      begin
+        klass.default_external_name = lambda { |event| "#{event.category_name}-super-custom-#{event.name}" }
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :bar, { })
+        expect_event('foo-super-custom-bar', { })
+      ensure
+        klass.default_external_name = nil
+      end
+    end
+
+    it "should allow resetting the default external name from the class back to the built-in default" do
+      begin
+        klass.default_external_name = lambda { |event| "#{event.category_name}-super-custom-#{event.name}" }
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :bar, { })
+        expect_event('foo-super-custom-bar', { })
+
+        klass.default_external_name = nil
+
+        i = klass.new(@distinct_id, nil, :event_receivers => receiver_1, :definitions => definition_set)
+        i.event!(:foo, :bar, { })
+        expect_event('xy1_foo_bar', { })
+      ensure
+        klass.default_external_name = nil
+      end
+    end
+
+    it "should allow overriding the external name in the constructor" do
+      i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| "#{event.category_name}-super-custom-#{event.name}" })
+      i.event!(:foo, :bar, { })
+      expect_event('foo-super-custom-bar', { })
+    end
+
+    it "should require the result of the external name to be a string" do
+      expect {
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| 1234 })
+        i.event!(:foo, :bar, { })
+      }.to raise_error(TypeError, /external name/i)
+    end
+
+    context "with default_external_name set" do
+      before :each do
+        klass.default_external_name = lambda { |event| "default-#{event.category_name}-#{event.name}-custom" }
+      end
+
+      after :each do
+        klass.default_external_name = nil
+      end
+
+      it "should return event external_name if set" do
+        i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| "#{event.category_name}-#{event.name}-custom" })
+        i.event!(:foo, :baz, { })
+        expect_event('foo bazzeroo', { })
+      end
+
+      context "no event external_name is set" do
+        it "should return instance external_name" do
+          i = new_instance(@distinct_id, nil, :definitions => definition_set, :external_name => lambda { |event| "#{event.category_name}-#{event.name}-custom" })
+          i.event!(:foo, :bar, { })
+          expect_event('foo-bar-custom', { })
+        end
+
+        context "no instance external_name is set" do
+          it "should return default_external_name" do
+            i = new_instance(@distinct_id, nil, :definitions => definition_set)
+            i.event!(:foo, :bar, { })
+            expect_event('default-foo-bar-custom', { })
+          end
+        end
+      end
     end
 
     it "should allow firing a valid event, and include implicit properties" do
@@ -413,7 +494,7 @@ EOS
     end
 
     it "should include no additional keys" do
-      expect(@instance.effective_properties(:foo, :bar).keys.sort_by(&:to_s)).to eq(%w{distinct_id event_name properties}.map(&:to_sym).sort_by(&:to_s))
+      expect(@instance.effective_properties(:foo, :bar).keys.sort_by(&:to_s)).to eq(%w{distinct_id event_name external_name properties}.map(&:to_sym).sort_by(&:to_s))
     end
   end
 
