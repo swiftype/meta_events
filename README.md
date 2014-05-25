@@ -11,7 +11,9 @@ particularly dependent on exact Ruby versions, and should be compatible with a b
 
 Current build status: ![Current Build Status](https://api.travis-ci.org/swiftype/meta_events.png?branch=master)
 
-Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First version written by [Andrew Geweke](https://www.github.com/ageweke).
+Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First version written by [Andrew Geweke](https://www.github.com/ageweke). Major contributions by:
+
+* [Aaron Lerch](https://github.com/aaronlerch): support for sending human-readable event names to Mixpanel via `:external_name` in the DSL on an Event, or via `:external_name` in `MetaEvents::Tracker#initialize` or `MetaEvents::Tracker.default_external_name`.
 
 ### Background
 
@@ -592,10 +594,10 @@ in parallel.
 ### Customizing the Event Name
 
 Developers love names like "xyz1_user_signed_up" but sometimes it's not a developer doing the analysis.
-Depending on what the back-end analytics library supports, event names in external systems are frequently not 
+Depending on what the back-end analytics library supports, event names in external systems are frequently not
 given a lot of real estate.
 
-In cases like these, you can override the default external event name behavior. There are three ways to 
+In cases like these, you can override the default external event name behavior. There are three ways to
 override these external names.
 
 First, you can override them globally for all `MetaEvents::Tracker` instances:
@@ -604,8 +606,8 @@ First, you can override them globally for all `MetaEvents::Tracker` instances:
 
 Second, you can override them for a specific `MetaEvents::Tracker` instance:
 
-    MetaEvents::Tracker.new(current_user.try(:id), 
-                        request.remote_ip, 
+    MetaEvents::Tracker.new(current_user.try(:id),
+                        request.remote_ip,
                         :external_name => lambda { |event| "#{event.category_name} #{event.name}" }
                        )
 
