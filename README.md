@@ -52,6 +52,9 @@ use a powerful mechanism to fire front-end events in any way you want.
 
 Let's get started. We'll assume we're working in a Rails project, although MetaEvents has no dependencies on Rails or any other particular framework. We'll also assume you've installed the MetaEvents gem (ideally via your `Gemfile`).
 
+**Note**: You will also need to provide whatever API your analytics system uses; for example, in the case of Mixpanel,
+you must also add `gem mixpanel-ruby` to your `Gemfile`.
+
 ### Declaring Events
 
 First, let's declare an event that we want to fire. Create `config/meta_events.rb` (MetaEvents automatically
@@ -169,6 +172,11 @@ You can fire front-end events with MetaEvents in two ways: _auto-tracking_ and _
 the use of Rails (because `MetaEvents::ControllerMethods` is intended for use with `ActionController`, and
 `MetaEvents::Helpers` is intended for use with `ActionView`), although the techniques are generally applicable and
 easy enough to use with any framework.
+
+**Note**: Again, because MetaEvents does not directly require any one user-centric analytics system, you must make sure
+the JavaScript API to whatever system you're using is loaded, too. So, for example, if you're using Mixpanel, make sure
+the JavaScript code Mixpanel provides you to use its API is loaded on your page _as well as_ the MetaEvents JavaScript
+code.
 
 #### Auto-Tracking
 
@@ -340,7 +348,7 @@ There are a few situations where you need to take special care, however:
   way to do this, as well as using something like nginx's `ngx_http_userid_module`.
   (Note that Mixpanel has facilities to do this automatically; however, it uses cookies set on their
   domain, which means you can't read them, which limits it unacceptably &mdash; server-side code and even your own
-  Javascript will be unable to use this ID.)
+  Javascript will be unable to use this ID.) If you do this, take a look at [`web_server_uid`](https://github.com/swiftype/web_server_uid), a gem that makes manipulating the resulting IDs vastly easier in Ruby.
 * **What do I do when a user logs in?** Typically, you simply want to switch completely from using their old
   (cookie-based) unique ID to using the primary key of your `users` table (or whatever you use for tracking logged-in
   users). This may seem counterintuitive, but it makes sense, particularly in broad consumer applications: until
@@ -492,6 +500,31 @@ to you.
 # Miscellaneous and Trivia
 
 A few things before we're done:
+
+### Performance and Asynchronousness
+
+When deploying Mixpanel or other such systems in a live application, you very often want to dispatch event reporting
+in the background, so that any slowdown in Mixpanel's servers doesn't slow down your application (or, in the worst
+case, bring it down entirely). Typically, this is done using something like [Resque](https://github.com/resque/resque),
+[Sidekiq](http://sidekiq.org/), or another queue-based system. There are literally dozens of these systems available
+for Ruby, and it's highly likely that your codebase either uses one already or will soon. Additionally, many users
+layer additional features like logging, durability, or other infrastructure services on top of the base functionality
+of these packages.
+
+Because there is such a wide variety of these systems available, MetaEvents does not _directly_ provide support for
+them &mdash; doing so would be a great deal of effort, and yet still unlikely to satisfy most users. Instead,
+MetaEvents makes it very easy to use any package you want:
+
+    class MyEventReceiver
+      def track(distinct_id, event_name, event_properties)
+        # Call Resque, Sidekiq, or anything else you want here; enqueue a job that, when run, will call:
+        #   Mixpanel::Tracker.new($my_mixpanel_api_key).track(distinct_id, event_name, event_properties)
+      end
+    end
+
+    MetaEvents::Tracker.default_event_receivers << MyEventReceiver.new
+
+Voilà &mdash; asynchronous event tracking.
 
 ### Mixpanel, Aliasing, and People
 
