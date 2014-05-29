@@ -76,7 +76,7 @@ module MetaEvents
       output_attributes[:class] = classes
 
       # Set the data attributes we'll be looking for...
-      output_attributes["data-#{meta_events_prefix_attribute('evt')}"] = props_data[:event_name]
+      output_attributes["data-#{meta_events_prefix_attribute('evt')}"] = props_data[:external_name]
       output_attributes["data-#{meta_events_prefix_attribute('prp')}"] = props_data[:properties].to_json
 
       # And we're done!

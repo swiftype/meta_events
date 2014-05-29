@@ -194,6 +194,12 @@ describe MetaEvents::ControllerMethods do
       expect(remaining['data']).to be_nil
     end
 
+    it "should use the #external_name for the event" do
+      me = { :category => 'foo', :event => 'custom', :properties => { :something => 'awesome' } }
+      remaining = expect_meta4({ :meta_event => me }, %w{mejtp_trk}, 'super-amazing-custom', { 'something' => 'awesome', 'imp1' => 'imp1val1' })
+      expect(remaining['data']).to be_nil
+    end
+
     it "should combine the class with an existing class string" do
       me = { :category => 'foo', :event => 'bar', :properties => { :something => 'awesome' } }
       remaining = expect_meta4({ :meta_event => me, :class => 'bonko baz' }, [ 'bonko baz', 'mejtp_trk' ], 'xy1_foo_bar', { 'something' => 'awesome', 'imp1' => 'imp1val1' })

@@ -1,5 +1,10 @@
 # `meta_events` Changelog
 
+### 1.1.2, 29 May 2014
+
+* The `:external_name` on an Event was not correctly passed (instead of the fully-qualified event name) when using
+  link auto-tracking. This fixes the issue, and adds a spec to make sure it works properly.
+
 ### 1.1.1, 26 May 2014
 
 * 1.1.0 was accidentally released with a bad dependency that prevented it from installing against anything that used
