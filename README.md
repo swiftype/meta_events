@@ -1,3 +1,5 @@
+*Hacky fork that adds a global configurable properties_seperator that overrides the default merge_properties underscore seperator.*
+
 `MetaEvents` is a Ruby gem that sits on top of a user-centric analytics system like
 [Mixpanel](https://www.mixpanel.com/) and provides structure, documentation, and a historical record to events,
 and a powerful properties system that makes it easy to pass large numbers of consistent properties with your events.

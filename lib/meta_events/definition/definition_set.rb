@@ -48,10 +48,14 @@ module MetaEvents
       def initialize(options = { }, &block)
         @global_events_prefix = nil
         @versions = { }
+        @properties_seperator = '_'
 
         options.assert_valid_keys(:global_events_prefix, :definition_text)
+        options.assert_valid_keys(:global_events_prefix, :definition_text, :properties_seperator)
 
         global_events_prefix options[:global_events_prefix] if options[:global_events_prefix]
+
+        properties_seperator options[:properties_seperator] if options[:properties_seperator]
 
         @source_description = "passed-in data/block"
 
@@ -77,6 +81,14 @@ module MetaEvents
           @global_events_prefix = prefix.to_s
         else
           @global_events_prefix
+        end
+      end
+
+      def properties_seperator(seperator = nil)
+        if seperator
+          @properties_seperator = seperator
+        else
+          @properties_seperator
         end
       end
 

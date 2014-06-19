@@ -224,10 +224,10 @@ module MetaEvents
   #
   # There might be a situation where users performing analysis desire a friendlier name than the default.
   # The external name can be customized with a lambda (or any object that responds to <tt>#call(event)</tt>).
-  # To customize the external name for all MetaEvents::Tracker instances, 
+  # To customize the external name for all MetaEvents::Tracker instances,
   # specify <tt>MetaEvents::Tracker.default_external_name = lambda { |event| "custom event name" }</tt>.
-  # 
-  # To customize the external name for a specific MetaEvents::Tracker instance, pass the lambda 
+  #
+  # To customize the external name for a specific MetaEvents::Tracker instance, pass the lambda
   # in the constructor, for example:
   # <tt>MetaEvents::Tracker.new(current_user.id, request.remote_ip, :external_name => lambda {|e| "#{e.full_name}_CUSTOM" })</tt>
   #
@@ -333,7 +333,7 @@ module MetaEvents
     #                        with every event fired from this Tracker. This can use the hash-merge and object syntax
     #                        (#to_event_properties) documented above. Any properties explicitly passed with an event
     #                        that have the same name as these properties will override these properties for that event.
-    # [:external_name] If present, this should be a lambda that takes a single argument and returns a string, or an 
+    # [:external_name] If present, this should be a lambda that takes a single argument and returns a string, or an
     #                  object that responds to call(event). If +:external_name+ is not provided, it will use the
     #                  default configured for the MetaEvents::Tracker class.
     def initialize(distinct_id, ip, options = { })
@@ -354,8 +354,8 @@ module MetaEvents
       raise ArgumentError, ":external_name option must respond to #call" unless @external_name.respond_to? :call
 
       @implicit_properties = { }
-      self.class.merge_properties(@implicit_properties, { :ip => normalize_ip(ip).to_s }) if ip
-      self.class.merge_properties(@implicit_properties, options[:implicit_properties] || { })
+      self.class.merge_properties(@implicit_properties, { :ip => normalize_ip(ip).to_s }, @definitions.properties_seperator) if ip
+      self.class.merge_properties(@implicit_properties, options[:implicit_properties] || { }, @definitions.properties_seperator)
       self.distinct_id = distinct_id if distinct_id
 
       self.event_receivers = Array(options[:event_receivers] || self.class.default_event_receivers.dup)
@@ -411,7 +411,7 @@ module MetaEvents
       event = version_object.fetch_event(category_name, event_name)
 
       explicit = { }
-      self.class.merge_properties(explicit, additional_properties)
+      self.class.merge_properties(explicit, additional_properties, @definitions.properties_seperator)
       properties = @implicit_properties.merge(explicit)
 
       event.validate!(properties)
@@ -472,7 +472,7 @@ module MetaEvents
       #
       # +depth+ should be an integer, indicating how many layers of recursive calls we've invoked; this is simply to
       # prevent infinite recursion -- if this exceeds +MAX_DEPTH+, above, then an exception will be raised.
-      def merge_properties(target, source, prefix = nil, depth = 0)
+      def merge_properties(target, source, properties_seperator, prefix = nil, depth = 0)
         if depth > MAX_DEPTH
           raise "Nesting in EventTracker is too great; do you have a circular reference? " +
             "We reached depth: #{depth.inspect}; expanding: #{source.inspect} with prefix #{prefix.inspect} into #{target.inspect}"
@@ -498,9 +498,9 @@ module MetaEvents
           net_value = normalize_scalar_property_value(value)
           if net_value == :invalid_property_value
             if value.kind_of?(Hash)
-              merge_properties(target, value, "#{prefixed_key}_", depth + 1)
+              merge_properties(target, value, properties_seperator, "#{prefixed_key}#{properties_seperator}", depth + 1)
             elsif value.respond_to?(:to_event_properties)
-              merge_properties(target, value.to_event_properties, "#{prefixed_key}_", depth + 1)
+              merge_properties(target, value.to_event_properties, properties_seperator, "#{prefixed_key}#{properties_seperator}", depth + 1)
             else
               raise ArgumentError, "Event property #{prefixed_key.inspect} is not a valid scalar, Hash, or object that " +
                 "responds to #to_event_properties, but rather #{value.inspect} (#{value.class.name})."
