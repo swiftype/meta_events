@@ -1,5 +1,14 @@
 # `meta_events` Changelog
 
+### 1.1.3, 30 June 2014
+
+* If you passed in a `Time` object to an `#event!` call, `meta_events` was calling `#utc` on it to normalize it to
+  UTC...and `Time#utc` (unbeknownst to me) _modifies_ its receiver, which is really bad. Now we call `Time#getutc`
+  instead, which doesn't do that. (Big shout-out to [Pete Sharum](https://github.com/petesharum) for catching and
+  fixing this, along with a spec for the fix!)
+* Added syntax highlighting to the README.
+* Bumped versions of Ruby we test against under Travis to the latest ones.
+
 ### 1.1.2, 29 May 2014
 
 * The `:external_name` on an Event was not correctly passed (instead of the fully-qualified event name) when using
