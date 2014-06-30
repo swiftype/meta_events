@@ -61,13 +61,15 @@ First, let's declare an event that we want to fire. Create `config/meta_events.r
 configures this as your events file if you're using Rails; if not, use `MetaEvents::Tracker.default_definitions =` to
 set the path to whatever file you like):
 
-    global_events_prefix :ab
+```ruby
+global_events_prefix :ab
 
-    version 1, "2014-02-04" do
-      category :user do
-        event :signed_up, "2014-02-04", "user creates a brand-new account"
-      end
-    end
+version 1, "2014-02-04" do
+  category :user do
+    event :signed_up, "2014-02-04", "user creates a brand-new account"
+  end
+end
+```
 
 Let's walk through this:
 
@@ -95,25 +97,29 @@ that's signed in, which is almost always just the primary key from the `users` t
 currently signed in. We also pass it the IP address of the user (which can safely be `nil`); Mixpanel, for example,
 uses this for doing geolocation of users:
 
-    class ApplicationController < ActionController::Base
-      ...
-      def meta_events_tracker
-        @meta_events_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip)
-      end
-      ...
-    end
+```ruby
+class ApplicationController < ActionController::Base
+  ...
+  def meta_events_tracker
+    @meta_events_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip)
+  end
+  ...
+end
+```
 
 Now, from the controller, we can fire an event and pass a couple of properties:
 
-    class UsersController < ApplicationController
-      ...
-      def create
-        ...
-        meta_events_tracker.event!(:user, :signed_up, { :user_gender => @new_user.gender, :user_age => @new_user.age })
-        ...
-      end
-      ...
-    end
+```ruby
+class UsersController < ApplicationController
+  ...
+  def create
+    ...
+    meta_events_tracker.event!(:user, :signed_up, { :user_gender => @new_user.gender, :user_age => @new_user.age })
+    ...
+  end
+  ...
+end
+```
 
 We're just about all done; but, right now, the event isn't actually going anywhere, because we haven't configured any
 _event receivers_.
@@ -129,7 +135,9 @@ transparently), and `Time` objects.
 Fortunately, the [Mixpanel](https://github.com/mixpanel/mixpanel-ruby) Gem complies with this interface perfectly.
 So, in `config/environments/production.rb` (or any other file that loads before your first event gets fired):
 
-    MetaEvents::Tracker.default_event_receivers << Mixpanel::Tracker.new("0123456789abcdef")
+```ruby
+MetaEvents::Tracker.default_event_receivers << Mixpanel::Tracker.new("0123456789abcdef")
+```
 
 (where `0123456789abcdef` is actually your Mixpanel API token)
 
@@ -137,7 +145,9 @@ In our development environment, we may or may not want to include Mixpanel itsel
 Mixpanel event receiver, above); however, we might also want to print events to the console or some other file as
 they are fired. So, in `config/environments/development.rb`:
 
-    MetaEvents::Tracker.default_event_receivers << MetaEvents::TestReceiver.new
+```ruby
+MetaEvents::Tracker.default_event_receivers << MetaEvents::TestReceiver.new
+```
 
 This will print events as they are fired to your Rails log (_e.g._, `log/development.log`); you can pass an argument
 to the constructor of `TestReceiver` that's a `Logger`, an `IO` (_e.g._, `STDOUT`, `STDERR`, an open `File` object),
@@ -186,13 +196,17 @@ picks up these attributes, decodes them, and calls any function you want with th
 
 As an example, in a view, you simply convert:
 
-    <%= link_to("go here", user_awesome_path, :class => "my_class") %>
+```html+erb
+<%= link_to("go here", user_awesome_path, :class => "my_class") %>
+```
 
 ...to:
 
-    <%= meta_events_tracked_link_to("go here", user_awesome_path, :class => "my_class",
-                                    :meta_event => { :category => :user, :event => :awesome,
-                                                     :properties => { :color => 'green' } }) %>
+```html+erb
+<%= meta_events_tracked_link_to("go here", user_awesome_path, :class => "my_class",
+                                :meta_event => { :category => :user, :event => :awesome,
+                                                 :properties => { :color => 'green' } }) %>
+```
 
 (Not immediately obvious: the `:meta_event` attribute is just part of the `html_options` `Hash` that
 `link_to` accepts, not an additional parameter. `meta_events_tracked_link_to` accepts exactly the same parameters as
@@ -200,12 +214,16 @@ As an example, in a view, you simply convert:
 
 This automatically turns the generated HTML from:
 
-    <a href="/users/awesome" class="my_class">go here</a>
+```html
+<a href="/users/awesome" class="my_class">go here</a>
+```
 
 to something like this:
 
-    <a href="/users/awesome" class="my_class mejtp_trk" data-mejtp-event="ab1_user_awesome"
-       data-mejtp-prp="{&quot;ip&quot;:&quot;127.0.0.1&quot;,&quot;color&quot;:&quot;green&quot;,&quot;implicit_prop_1&quot;:&quot;someValue&quot;}">go here</a>
+```html
+<a href="/users/awesome" class="my_class mejtp_trk" data-mejtp-event="ab1_user_awesome"
+   data-mejtp-prp="{&quot;ip&quot;:&quot;127.0.0.1&quot;,&quot;color&quot;:&quot;green&quot;,&quot;implicit_prop_1&quot;:&quot;someValue&quot;}">go here</a>
+```
 
 `mejtp` stands for "MetaEvents JavaScript Tracking Prefix", and is simply a likely-unique prefix for these values.
 (You can change it with `MetaEvents::Helpers.meta_events_javascript_tracking_prefix 'foo'`.) `mejtp_trk` is the class
@@ -214,15 +232,19 @@ of the event, and a JSON-encoded string of all the properties (both implicit and
 
 Now, add this to a Javascript file in your application:
 
-    //= require meta_events
+```javascript
+//= require meta_events
+```
 
 And, finally, call something like this:
 
-    $(document).ready(function() {
-      MetaEvents.forAllTrackableElements(document, function(id, element, eventName, properties) {
-        mixpanel.track_links("#" + id, eventName, properties);
-      })
-    });
+```javascript
+$(document).ready(function() {
+  MetaEvents.forAllTrackableElements(document, function(id, element, eventName, properties) {
+    mixpanel.track_links("#" + id, eventName, properties);
+  })
+});
+```
 
 `MetaEvents.forAllTrackableElements` accepts a root element to start searching at, and a callback function. It finds
 all elements with class `mejtp_trk` on them underneath that element, extracts the event name and properties, and adds
@@ -248,48 +270,56 @@ extra work &mdash; otherwise, how would we get those properties? However, it's n
 First off, make sure you get this into your layout in a `<script>` tag somewhere &mdash; at the bottom of the page is
 perfectly fine:
 
-    <%= meta_events_frontend_events_javascript %>
+```html+erb
+<%= meta_events_frontend_events_javascript %>
+```
 
 This allows MetaEvents to pass event data properly from the backend to the frontend for any events you'll be firing.
 
 Now, as an example, let's imagine we implement a JavaScript game on our site, and want to fire events when the user
 wins, loses, or gets a new high score. First, let's define those in our DSL:
 
-    global_events_prefix :ab
+```ruby
+global_events_prefix :ab
 
-    version 1, "2014-02-11" do
-      category :jsgame do
-        event :won, "2014-02-11", "user won a game!"
-        event :lost, "2014-02-11", "user lost a game"
-        event :new_high_score, "2014-02-11", "user got a new high score"
-      end
-    end
+version 1, "2014-02-11" do
+  category :jsgame do
+    event :won, "2014-02-11", "user won a game!"
+    event :lost, "2014-02-11", "user lost a game"
+    event :new_high_score, "2014-02-11", "user got a new high score"
+  end
+end
+```
 
 Now, in whatever controller action renders the page that the game is on, we need to _register_ these events. This
 tells the front-end integration that we might fire them from the resulting page; it therefore embeds JavaScript in the
 page that defines the set of properties for those events, so that the front end has access to the data it needs:
 
-    class GameController < ApplicationController
-      def game
-        ...
-        meta_events_define_frontend_event(:jsgame, :won, { :winning_streak => current_winning_streak })
-        meta_events_define_frontend_event(:jsgame, :lost, { :losing_streak => current_losing_streak })
-        meta_events_define_frontend_event(:jsgame, :new_high_score, { :previous_high_score => current_high_score })
-        ...
-      end
-    end
+```ruby
+class GameController < ApplicationController
+  def game
+    ...
+    meta_events_define_frontend_event(:jsgame, :won, { :winning_streak => current_winning_streak })
+    meta_events_define_frontend_event(:jsgame, :lost, { :losing_streak => current_losing_streak })
+    meta_events_define_frontend_event(:jsgame, :new_high_score, { :previous_high_score => current_high_score })
+    ...
+  end
+end
+```
 
 This will allow us to make the following calls in the frontend, from our game code:
 
-    if (wonGame) {
-      MetaEvents.event('jsgame_won');
-    } else {
-      MetaEvents.event('jsgame_lost');
-    }
+```javascript
+if (wonGame) {
+  MetaEvents.event('jsgame_won');
+} else {
+  MetaEvents.event('jsgame_lost');
+}
 
-    if (currentScore > highScore) {
-      MetaEvents.event('jsgame_new_high_score', { score: currentScore });
-    }
+if (currentScore > highScore) {
+  MetaEvents.event('jsgame_new_high_score', { score: currentScore });
+}
+```
 
 What's happened here is that `meta_events_define_frontend_event` took the set of properties you passed, merged them
 with any implicit properties defined, and passed them to the frontend via the `meta_events_frontend_events_javascript`
@@ -304,21 +334,24 @@ event alias; they will all be merged together, along with the properties supplie
 If you need to be able to fire the exact same event with _different_ sets of properties from different places in a
 single page, you can alias the event using the `:name` property:
 
-    class GameController < ApplicationController
-      def game
-        ...
-        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :winning }, { :name => :paused_while_winning })
-        meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :losing }, { :name => :paused_while_losing })
-        ...
-      end
-    end
-
+```ruby
+class GameController < ApplicationController
+  def game
     ...
-    if (winning) {
-      MetaEvents.event('paused_while_winning');
-    } else {
-      MetaEvents.event('paused_while_losing');
-    }
+    meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :winning }, { :name => :paused_while_winning })
+    meta_events_define_frontend_event(:jsgame, :paused_game, { :while => :losing }, { :name => :paused_while_losing })
+    ...
+  end
+end
+```
+```javascript
+...
+if (winning) {
+  MetaEvents.event('paused_while_winning');
+} else {
+  MetaEvents.event('paused_while_losing');
+}
+```
 
 Both calls from the JavaScript will fire the event `ab1_jsgame_paused_game`, but one of them will pass
 `while: 'winning'`, and the other `while: 'losing'`.
@@ -382,21 +415,23 @@ going to want to pass properties about that user to any event that happens in th
 You could add these to every single call to `#event!`, but MetaEvents has a better way. When you create the
 `MetaEvents::Tracker` instance, you can define _implicit properties_. Let's add some now:
 
-    class ApplicationController < ActionController::Base
-      ...
-      def meta_events_tracker
-        implicit_properties = { }
-        if current_user
-          implicit_properties.merge!(
-            :user_gender => current_user.gender,
-            :user_age => current_user.age
-          )
-        end
-        @meta_events_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip,
-                                                        :implicit_properties => implicit_properties)
-      end
-      ...
+```ruby
+class ApplicationController < ActionController::Base
+  ...
+  def meta_events_tracker
+    implicit_properties = { }
+    if current_user
+      implicit_properties.merge!(
+        :user_gender => current_user.gender,
+        :user_age => current_user.age
+      )
     end
+    @meta_events_tracker ||= MetaEvents::Tracker.new(current_user.try(:id), request.remote_ip,
+                                                    :implicit_properties => implicit_properties)
+  end
+  ...
+end
+```
 
 Now, these properties will get passed on every event fired by this Tracker. (This is, in fact, the biggest
 consideration when deciding when and where you'll create new `MetaEvents::Tracker` instances: implicit properties are
@@ -410,31 +445,33 @@ properties that are defined on it. For example, imagine we have an event trigger
 another user. We have at least three entities: the 'from' user, the 'to' user, and the message itself. If we really
 want to instrument this event properly, we're going to want something like this:
 
-    meta_events_tracker.event!(:user, :sent_message, {
-      :from_user_country => from_user.country,
-      :from_user_state => from_user.state,
-      :from_user_postcode => from_user.postcode,
-      :from_user_city => from_user.city,
-      :from_user_language => from_user.language,
-      :from_user_referred_from => from_user.referred_from,
-      :from_user_gender => from_user.gender,
-      :from_user_age => from_user.age,
+```ruby
+meta_events_tracker.event!(:user, :sent_message, {
+  :from_user_country => from_user.country,
+  :from_user_state => from_user.state,
+  :from_user_postcode => from_user.postcode,
+  :from_user_city => from_user.city,
+  :from_user_language => from_user.language,
+  :from_user_referred_from => from_user.referred_from,
+  :from_user_gender => from_user.gender,
+  :from_user_age => from_user.age,
 
-      :to_user_country => to_user.country,
-      :to_user_state => to_user.state,
-      :to_user_postcode => to_user.postcode,
-      :to_user_city => to_user.city,
-      :to_user_language => to_user.language,
-      :to_user_referred_from => to_user.referred_from,
-      :to_user_gender => to_user.gender,
-      :to_user_age => to_user.age,
+  :to_user_country => to_user.country,
+  :to_user_state => to_user.state,
+  :to_user_postcode => to_user.postcode,
+  :to_user_city => to_user.city,
+  :to_user_language => to_user.language,
+  :to_user_referred_from => to_user.referred_from,
+  :to_user_gender => to_user.gender,
+  :to_user_age => to_user.age,
 
-      :message_sent_at => message.sent_at,
-      :message_type => message.type,
-      :message_length => message.length,
-      :message_language => message.language,
-      :message_attachments => message.attachments?
-      })
+  :message_sent_at => message.sent_at,
+  :message_type => message.type,
+  :message_length => message.length,
+  :message_language => message.language,
+  :message_attachments => message.attachments?
+  })
+```
 
 Needless to say, this kind of sucks. Either we're going to end up with a ton of duplicate, unmaintainable code, or
 we'll just cut back and only pass a few properties &mdash; greatly reducing the possibilities of our analytics
@@ -445,40 +482,44 @@ system.
 We can improve this situation by using a feature of MetaEvents: when properties are nested in sub-hashes, they get
 automatically expanded and their names prefixed by the outer hash key. So let's define a couple of methods on models:
 
-    class User < ActiveRecord::Base
-      def to_event_properties
-        {
-          :country => country,
-          :state => state,
-          :postcode => postcode,
-          :city => city,
-          :language => language,
-          :referred_from => referred_from,
-          :gender => gender,
-          :age => age
-        }
-      end
-    end
+```ruby
+class User < ActiveRecord::Base
+  def to_event_properties
+    {
+      :country => country,
+      :state => state,
+      :postcode => postcode,
+      :city => city,
+      :language => language,
+      :referred_from => referred_from,
+      :gender => gender,
+      :age => age
+    }
+  end
+end
 
-    class Message < ActiveRecord::Base
-      def to_event_properties
-        {
-          :sent_at => sent_at,
-          :type => type,
-          :length => length,
-          :language => language,
-          :attachments => attachments?
-        }
-      end
-    end
+class Message < ActiveRecord::Base
+  def to_event_properties
+    {
+      :sent_at => sent_at,
+      :type => type,
+      :length => length,
+      :language => language,
+      :attachments => attachments?
+    }
+  end
+end
+```
 
 Now, we can pass the exact same set of properties as the above example, by simply doing:
 
-    meta_events_tracker.event!(:user, :sent_message, {
-      :from_user => from_user.to_event_properties,
-      :to_user => to_user.to_event_properties,
-      :message => message.to_event_properties
-      })
+```ruby
+meta_events_tracker.event!(:user, :sent_message, {
+  :from_user => from_user.to_event_properties,
+  :to_user => to_user.to_event_properties,
+  :message => message.to_event_properties
+  })
+```
 
 **SO** much better.
 
@@ -488,7 +529,9 @@ And &mdash; tah-dah! &mdash; MetaEvents supports this syntax automatically. If y
 that object defines a method called `#to_event_properties`, then it will be called automatically, and replaced.
 Our code now looks like:
 
-    meta_events_tracker.event!(:user, :sent_message, { :from_user => from_user, :to_user => to_user, :message => message })
+```ruby
+meta_events_tracker.event!(:user, :sent_message, { :from_user => from_user, :to_user => to_user, :message => message })
+```
 
 ### How to Take the Most Advantage
 
@@ -515,14 +558,16 @@ Because there is such a wide variety of these systems available, MetaEvents does
 them &mdash; doing so would be a great deal of effort, and yet still unlikely to satisfy most users. Instead,
 MetaEvents makes it very easy to use any package you want:
 
-    class MyEventReceiver
-      def track(distinct_id, event_name, event_properties)
-        # Call Resque, Sidekiq, or anything else you want here; enqueue a job that, when run, will call:
-        #   Mixpanel::Tracker.new($my_mixpanel_api_key).track(distinct_id, event_name, event_properties)
-      end
-    end
+```ruby
+class MyEventReceiver
+  def track(distinct_id, event_name, event_properties)
+    # Call Resque, Sidekiq, or anything else you want here; enqueue a job that, when run, will call:
+    #   Mixpanel::Tracker.new($my_mixpanel_api_key).track(distinct_id, event_name, event_properties)
+  end
+end
 
-    MetaEvents::Tracker.default_event_receivers << MyEventReceiver.new
+MetaEvents::Tracker.default_event_receivers << MyEventReceiver.new
+```
 
 Voilà &mdash; asynchronous event tracking.
 
@@ -551,14 +596,16 @@ control, but that's a pain.)
 
 Rather than doing this, you can retire them:
 
-    global_events_prefix :ab
+```ruby
+global_events_prefix :ab
 
-    version 1, "2014-02-04" do
-      category :user do
-        event :logged_in_with_facebook, "2014-02-04", "user creates a brand-new account", :retired_at => "2014-06-01"
-        event :signed_up, "2014-02-04", "user creates a brand-new account"
-      end
-    end
+version 1, "2014-02-04" do
+  category :user do
+    event :logged_in_with_facebook, "2014-02-04", "user creates a brand-new account", :retired_at => "2014-06-01"
+    event :signed_up, "2014-02-04", "user creates a brand-new account"
+  end
+end
+```
 
 Given the above, trying to call `event!(:user, :logged_in_with_facebook)` will fail with an exception, because the
 event has been retired. (Note that, once again, the actual date passed to `:retired_at` is simply for record-keeping
@@ -572,15 +619,17 @@ of what things were in the past, as well as what they are today.
 You can also add notes to events. They must be tagged with the author and the time, and they can be very useful for
 documenting changes:
 
-    global_events_prefix :ab
+```ruby
+global_events_prefix :ab
 
-    version 1, "2014-02-04" do
-      category :user do
-        event :signed_up, "2014-02-04", "user creates a brand-new account" do
-          note "2014-03-17", "jsmith", "Moved sign-up button to the home page -- should increase signups significantly"
-        end
-      end
+version 1, "2014-02-04" do
+  category :user do
+    event :signed_up, "2014-02-04", "user creates a brand-new account" do
+      note "2014-03-17", "jsmith", "Moved sign-up button to the home page -- should increase signups significantly"
     end
+  end
+end
+```
 
 This allows you to record changes to events, as well as the events themselves.
 
@@ -635,24 +684,30 @@ override these external names.
 
 First, you can override them globally for all `MetaEvents::Tracker` instances:
 
-    MetaEvents::Tracker.default_external_name = lambda { |event| "#{event.category_name} #{event.name}" }
+```ruby
+MetaEvents::Tracker.default_external_name = lambda { |event| "#{event.category_name} #{event.name}" }
+```
 
 Second, you can override them for a specific `MetaEvents::Tracker` instance:
 
-    MetaEvents::Tracker.new(current_user.try(:id),
-                        request.remote_ip,
-                        :external_name => lambda { |event| "#{event.category_name} #{event.name}" }
-                       )
+```ruby
+MetaEvents::Tracker.new(current_user.try(:id),
+                    request.remote_ip,
+                    :external_name => lambda { |event| "#{event.category_name} #{event.name}" }
+                   )
+```
 
 Finally, you can override each event's external name in the events DSL:
 
-    global_events_prefix :ab
+```ruby
+global_events_prefix :ab
 
-    version 1, "2014-02-11" do
-      category :example_category do
-        event :example_event, "2014-02-11", "Example was exampled!", :external_name => 'ex. was ex.'
-      end
-    end
+version 1, "2014-02-11" do
+  category :example_category do
+    event :example_event, "2014-02-11", "Example was exampled!", :external_name => 'ex. was ex.'
+  end
+end
+```
 
 The order of precedence for determining the external event name is the DSL's `event :external_name => 'foo'`,
 `MetaEvents::Tracker.new`, `MetaEvents::Tracker.default_external_name`, built-in default.
