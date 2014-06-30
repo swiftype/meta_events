@@ -584,5 +584,37 @@ EOS
         expect(klass.normalize_scalar_property_value(input)).to eq(output)
       end
     end
+
+    it "should not modify passed values" do
+      t = Time.parse("2008-09-04 3:46:12 PM -08:00")
+      [
+        nil,
+        true,
+        false,
+        3,
+        42.5e+17,
+        3.months,
+        :foobar,
+        :' FooBar  ',
+        ' FooBar  ',
+        t,
+        [ "foo", :bar, 123, -9.45e+17, t, false, nil, true, "  BoNk " ],
+        /foobar/,
+        Object.new
+      ].each do |input|
+        expect { klass.normalize_scalar_property_value(input) }.to_not change { input }
+      end
+
+      nan = (0.0 / 0.0)
+      expect { klass.normalize_scalar_property_value(nan) }.to_not change { nan.nan? }
+
+      infinity = (1.0 / 0.0)
+      expect { klass.normalize_scalar_property_value(infinity) }.to_not change { infinity.infinite? }
+
+      neg_infinity = -(1.0 / 0.0)
+      expect { klass.normalize_scalar_property_value(neg_infinity) }.to_not change { neg_infinity.infinite? }
+
+      expect { klass.normalize_scalar_property_value(t) }.to_not change { t.zone }
+    end
   end
 end
