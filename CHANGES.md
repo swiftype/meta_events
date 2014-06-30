@@ -1,7 +1,11 @@
 # `meta_events` Changelog
 
-### 1.1.3, 30 June 2014
+### 1.2.0, 30 June 2014
 
+* You can now customize the separator used in nested properties by passing (_e.g._) `:property_separator => ' '` to
+  the declaration of a `version` in the definition DSL. This allows you to get nested properties named things like
+  `user age`, `user name`, and so on, rather than `user_age` and `user_name`. (Thanks to
+  [Harm de Wit](https://github.com/harmdewit) for the idea.)
 * If you passed in a `Time` object to an `#event!` call, `meta_events` was calling `#utc` on it to normalize it to
   UTC...and `Time#utc` (unbeknownst to me) _modifies_ its receiver, which is really bad. Now we call `Time#getutc`
   instead, which doesn't do that. (Big shout-out to [Pete Sharum](https://github.com/petesharum) for catching and

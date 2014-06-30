@@ -4,16 +4,15 @@ and a powerful properties system that makes it easy to pass large numbers of con
 
 MetaEvents supports:
 
-* Ruby 1.8.7, 1.9.3, 2.0.0, 2.1.1, or JRuby 1.7.11
+* Ruby 1.8.7, 1.9.3, 2.0.0, 2.1.2, or JRuby 1.7.12
 
 These are, however, just the versions it's tested against; MetaEvents contains no code that should be at all
 particularly dependent on exact Ruby versions, and should be compatible with a broad set of versions.
 
 Current build status: ![Current Build Status](https://api.travis-ci.org/swiftype/meta_events.png?branch=master)
 
-Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First version written by [Andrew Geweke](https://www.github.com/ageweke). Major contributions by:
-
-* [Aaron Lerch](https://github.com/aaronlerch): support for sending human-readable event names to Mixpanel via `:external_name` in the DSL on an Event, or via `:external_name` in `MetaEvents::Tracker#initialize` or `MetaEvents::Tracker.default_external_name`.
+Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First version written by
+[Andrew Geweke](https://www.github.com/ageweke). For additional contributors, see [CONTRIBUTORS](CONTRIBUTORS.md).
 
 ### Background
 
@@ -711,6 +710,35 @@ end
 
 The order of precedence for determining the external event name is the DSL's `event :external_name => 'foo'`,
 `MetaEvents::Tracker.new`, `MetaEvents::Tracker.default_external_name`, built-in default.
+
+### Customizing the Nested Property Separator
+
+Similarly, while developers might be perfectly comfortable with (and even prefer) expanded properties named things
+like `user_age`, `user_name`, and so on, others might want a different separator (like a space character). When
+defining a version, you can set this, as follows:
+
+```ruby
+global_events_prefix :ab
+
+version 1, "2014-02-11", :property_separator => ' ' do
+  category :example_category do
+    event :example_event, "2014-02-11", "Example was exampled!"
+  end
+end
+```
+
+Now, assuming `@user` is a `User` object that responds to `#to_event_properties` (or is just a `Hash`):
+
+```ruby
+tracker.event!(:example_category, :example_event, :user => @user)
+```
+
+...you'll get properties named `user age`, `user name`, and so on, rather than `user_age` and `user_name`.
+
+Note that this is defined on the `version`, not the `category`, `event`, or even `#event!` call, because changing
+this is _a big deal_ &mdash; changing property names almost always breaks all kinds of analysis you might want to do
+with your analytics tool. However, the idea is that changing `version`s is a breaking change to your analytics
+system anyway, so you can certainly set it on a new `version` to something different.
 
 ## Contributing
 

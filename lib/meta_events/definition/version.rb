@@ -15,6 +15,8 @@ module MetaEvents
     class Version
       attr_reader :definition_set, :number, :introduced
 
+      DEFAULT_PROPERTY_SEPARATOR = "_"
+
       # Creates a new instance. +definition_set+ is the MetaEvents::Definition::DefinitionSet to which this Version belongs;
       # +number+ is an integer telling you, well, which version this is -- it must be unique within the DefinitionSet.
       # +introduced+ is a String that must be parseable using Time.parse; this should be the date (and time, if you
@@ -43,9 +45,10 @@ module MetaEvents
         @introduced = Time.parse(introduced)
         @categories = { }
 
-        options.assert_valid_keys(:retired_at)
+        options.assert_valid_keys(:retired_at, :property_separator)
 
         @retired_at = Time.parse(options[:retired_at]) if options[:retired_at]
+        @property_separator = options[:property_separator] || DEFAULT_PROPERTY_SEPARATOR
 
         instance_eval(&block) if block
       end
@@ -78,6 +81,23 @@ module MetaEvents
       # Returns the Time at which this version was retired, or +nil+ if it is still active.
       def retired_at
         @retired_at
+      end
+
+      # Returns the string that should be used in property expansion to separate the two (or more) parts of the
+      # property name. For example, if you pass to +MetaEvents::Tracker#event!+ in +additional_properties+
+      # (or in the implicit properties taken by +MetaEvents::Tracker#initialize+) data that looks like
+      # <tt>:user => { :first_name => 'Fiona', :last_name => 'Darling' }</tt>, then, by default, you end up
+      # with properties named +user_first_name+ and +user_last_name+.
+      #
+      # If, instead, you set <tt>:property_separator => '~'</tt> on your Version, then you end up with properties
+      # named +user~first_name+ and +user~last_name+. This can be used to change property names to your liking.
+      #
+      # This is defined on the +Version+ so that you can change it if you redo your entire events system. It is not
+      # defined at a lower level, because having property names change is a _big deal_ -- it breaks data analysis
+      # in an analytics system, and so you generally should not change it unless you're changing lots of other stuff
+      # that would break analytics as well, like when defining an entire new Version.
+      def property_separator
+        @property_separator
       end
 
       # Override #to_s, for a cleaner view.

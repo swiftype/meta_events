@@ -1,3 +1,4 @@
+require "meta_events"
 require "active_support"
 require 'active_support/core_ext/numeric/time'
 require 'ipaddr'
@@ -17,6 +18,12 @@ describe MetaEvents::Tracker do
       version 2, '2014-06-01' do
         category :foo do
           event :quux, '2014-01-31', 'this is quux'
+        end
+      end
+
+      version 3, '2014-07-01', :property_separator => '~' do
+        category :bar do
+          event :baz, '2014-07-01', 'this is baz'
         end
       end
     end
@@ -462,6 +469,18 @@ EOS
       expect_event('xy1_foo_bar', { 'user_name' => 'wilfred', 'user_hometown' => 'Fridley', 'location_city' => 'Edina', 'location_zip' => 55343 })
     end
 
+    it "should expand out nested properties using the #property_separator set on the version" do
+      i2 = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 3, :implicit_properties => { :user => @user } )
+      i2.event!(:bar, :baz, { :location => { :city => 'Edina', :zip => 55343 } })
+      expect_event('xy3_bar_baz', { 'user~name' => 'wilfred', 'user~hometown' => 'Fridley', 'location~city' => 'Edina', 'location~zip' => 55343 })
+    end
+
+    it "should expand out nested properties from #to_event_properties using the #property_separator set on the version" do
+      i2 = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 3, :implicit_properties => { :user => @user } )
+      i2.event!(:bar, :baz, { :location => tep_object(:city => 'Edina', :zip => 55343 ) })
+      expect_event('xy3_bar_baz', { 'user~name' => 'wilfred', 'user~hometown' => 'Fridley', 'location~city' => 'Edina', 'location~zip' => 55343 })
+    end
+
     it "should not allow firing a retired event" do
       expect { @instance.event!(:foo, :nolonger, { }) }.to raise_error(::MetaEvents::Definition::DefinitionSet::RetiredEventError)
     end
@@ -494,6 +513,13 @@ EOS
       expect(props).to eq('user_name' => 'bongo', 'user_hometown' => 'Fridley', 'baz_a' => 1, 'baz_b' => 'hoo')
     end
 
+    it "should respect the property_separator" do
+      i2 = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 3, :implicit_properties => { :user => @user } )
+      expect(i2.effective_properties(:bar, :baz)[:properties]).to eq('user~name' => 'wilfred', 'user~hometown' => 'Fridley')
+      props = i2.effective_properties(:bar, :baz, :baz => { :a => 1, :b => 'hoo' }, :'user~name' => 'bongo')[:properties]
+      expect(props).to eq('user~name' => 'bongo', 'user~hometown' => 'Fridley', 'baz~a' => 1, 'baz~b' => 'hoo')
+    end
+
     it "should include no additional keys" do
       expect(@instance.effective_properties(:foo, :bar).keys.sort_by(&:to_s)).to eq(%w{distinct_id event_name external_name properties}.map(&:to_sym).sort_by(&:to_s))
     end
@@ -502,7 +528,7 @@ EOS
   describe "#merge_properties" do
     def expand(hash)
       out = { }
-      klass.merge_properties(out, hash, "", 0)
+      klass.merge_properties(out, hash, "Z", "", 0)
       out
     end
 
@@ -540,20 +566,20 @@ EOS
     end
 
     it "should recursively expand hashes" do
-      expect(expand({ :foo => { :bar => ' whatEVs '} })).to eq({ 'foo_bar' => 'whatEVs' })
+      expect(expand({ :foo => { :bar => ' whatEVs '} })).to eq({ 'fooZbar' => 'whatEVs' })
       expect { expand({ :foo => { :bar => [ 1, 2, /foo/ ] } }) }.to raise_error(ArgumentError)
     end
 
     it "should call #to_event_properties for any object, and recursively expand that" do
-      expect(expand(:baz => tep_object({ :foo => ' BaR '}))).to eq({ 'baz_foo' => 'BaR' })
-      expect(expand(:baz => tep_object({ :foo => { :bar => ' yo yo yo '} }))).to eq({ 'baz_foo_bar' => 'yo yo yo' })
+      expect(expand(:baz => tep_object({ :foo => ' BaR '}))).to eq({ 'bazZfoo' => 'BaR' })
+      expect(expand(:baz => tep_object({ :foo => { :bar => ' yo yo yo '} }))).to eq({ 'bazZfooZbar' => 'yo yo yo' })
 
       subsidiary = tep_object({ :bar => :baz })
-      expect(expand(:baz => tep_object({ :foo => subsidiary }))).to eq({ 'baz_foo_bar' => 'baz' })
+      expect(expand(:baz => tep_object({ :foo => subsidiary }))).to eq({ 'bazZfooZbar' => 'baz' })
     end
 
     it "should raise if it detects a property-name conflict" do
-      expect { expand(:foo_bar => :quux1, :foo => { :bar => :quux }) }.to raise_error(MetaEvents::Tracker::PropertyCollisionError)
+      expect { expand(:fooZbar => :quux1, :foo => { :bar => :quux }) }.to raise_error(MetaEvents::Tracker::PropertyCollisionError)
     end
   end
 

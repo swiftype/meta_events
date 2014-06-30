@@ -10,3 +10,8 @@ Additional contributions by:
 * [Pete Sharum](https://github.com/petesharum): Fix for `Time` objects passed in; turns out `Time#utc` _modifies_ its
   receiver, which is bad.
 * [Jesse Rusak](https://github.com/jder): doc typos and fixes for usage of `Rails.logger`.
+
+Inspiration for ideas by:
+
+* [Harm de Wit](https://github.com/harmdewit) for adding a configurable `properties_separator` on the `version` in the
+  events DSL.

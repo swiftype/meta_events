@@ -1,3 +1,5 @@
+require 'meta_events/definition/version'
+
 describe ::MetaEvents::Definition::Version do
   let(:definition_set) do
     out = double("definition_set")
@@ -36,6 +38,15 @@ describe ::MetaEvents::Definition::Version do
 
   it "should return the prefix correctly" do
     instance.prefix.should == "gep3_"
+  end
+
+  it "should set the property_separator to underscore by default" do
+    instance.property_separator.should == "_"
+  end
+
+  it "should allow setting the property separator to something else in the constructor" do
+    i2 = klass.new(definition_set, 3, "2014-02-03", :property_separator => 'Z')
+    i2.property_separator.should == "Z"
   end
 
   context "with one category" do
