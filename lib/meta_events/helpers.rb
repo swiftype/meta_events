@@ -93,11 +93,17 @@ module MetaEvents
     # Obviously, feel free to create a shorter alias for this method in your application; we give it a long, unique
     # name here so that we don't accidentally collide with another helper method in your project.
     def meta_events_tracked_link_to(name = nil, options = nil, html_options = nil, &block)
+      html_options, options, name = options, name, nil if block_given?
+
       unless html_options && html_options[:meta_event]
         raise ArgumentError, "You asked for a tracked link, but you didn't provide a :meta_event: #{html_options.inspect}"
       end
 
-      link_to(name, options, meta_events_tracking_attributes_for(html_options, meta_events_tracker), &block)
+      if block_given?
+        link_to(options, meta_events_tracking_attributes_for(html_options, meta_events_tracker), &block)
+      else
+        link_to(name, options, meta_events_tracking_attributes_for(html_options, meta_events_tracker))
+      end
     end
 
 
