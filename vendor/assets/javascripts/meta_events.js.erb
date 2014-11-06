@@ -116,7 +116,7 @@ MetaEvents = (function() {
 
     if (eventData == null) {
       <% if Rails.env.development? %>
-      throw "No front-end event has been registered named '" + name + "'. Did you forget to call meta_events_define_frontend_event on the server?";
+      throw "No front-end event has been registered named '" + eventAlias + "'. Did you forget to call meta_events_define_frontend_event on the server?";
       <% end %>
       return;
     }
