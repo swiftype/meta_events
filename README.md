@@ -16,10 +16,19 @@ Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First vers
 
 ### Installation
 
+If you're in a project using [Bundler](http://bundler.io/) &mdash; for example, any Rails project, most Gems, and
+probably most other Ruby software these days &mdash; and therefore have a [`Gemfile`](http://bundler.io/gemfile.html),
+simply add this to the end of your `Gemfile`:
+
+```ruby
+gem 'meta_events'
+```
+
+Alternatively, if you aren't using Bundler:
+
 ```ruby
 gem install meta_events
 ```
-
 
 ### Background
 

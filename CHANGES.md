@@ -11,6 +11,7 @@
 * Fixed an issue where using `link_to` with a block would fail if you're using `meta_events`, due to the way Rails
   renames parameters in this scenario. (Thanks to [David Yarbro](https://github.com/yarbro) for the catch and the
   fix, and [Mark Quezada](https://github.com/markquezada) for submitting it as a pull request!)
+* Added installation instructions. (Thanks to [Anthony](https://github.com/Aerlinger) for the pull request!)
 
 ### 1.2.0, 30 June 2014
 
