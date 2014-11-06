@@ -1,5 +1,10 @@
 # `meta_events` Changelog
 
+### 1.2.1, 6 November 2014
+
+* Fixed an issue where you could get a `NoMethodError` (`undefined method 'watch' for Spring:Module`) if running with
+  Spring, depending on your exact load order and dependency set.
+
 ### 1.2.0, 30 June 2014
 
 * You can now customize the separator used in nested properties by passing (_e.g._) `:property_separator => ' '` to

@@ -1,3 +1,17 @@
+# See if we can load Spring -- but don't fail if we can't; this just helps us decide whether to call
+# Spring.watch.
+begin
+  gem 'spring'
+rescue Gem::LoadError => le
+  # ok
+end
+
+begin
+  require 'spring/watcher'
+rescue LoadError => le
+  # ok
+end
+
 module MetaEvents
   class Railtie < Rails::Railtie
     def say(x)
@@ -20,9 +34,7 @@ module MetaEvents
         ::MetaEvents::Tracker.default_definitions = config_meta_events
         say "Loaded event definitions from #{config_meta_events.inspect}"
 
-        if defined?(::Spring)
-          Spring.watch config_meta_events
-        end
+        Spring.watch config_meta_events if defined?(::Spring)
       end
     end
   end
