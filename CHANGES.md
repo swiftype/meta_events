@@ -3,7 +3,12 @@
 ### 1.2.1, 6 November 2014
 
 * Fixed an issue where you could get a `NoMethodError` (`undefined method 'watch' for Spring:Module`) if running with
-  Spring, depending on your exact load order and dependency set.
+  Spring, depending on your exact load order and dependency set. (Thanks to [charle5](https://github.com/charle5) for
+  the catch, and [charle5](https://github.com/charle5) and [Fabian Stehle](https://github.com/fstehle) for fixes!)
+* Fixed an issue where the JavaScript exception you would get if you tried to invoke a front-end event that hadn't
+  been registered would have the wrong event name in it. (Thanks to [Hubert Lee](https://github.com/hube) for the
+  catch and the fix!)
+
 
 ### 1.2.0, 30 June 2014
 
