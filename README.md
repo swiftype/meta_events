@@ -14,6 +14,13 @@ Current build status: ![Current Build Status](https://api.travis-ci.org/swiftype
 Brought to you by the folks at [Swiftype](https://www.swiftype.com/). First version written by
 [Andrew Geweke](https://www.github.com/ageweke). For additional contributors, see [CONTRIBUTORS](CONTRIBUTORS.md).
 
+### Installation
+
+```ruby
+gem install meta_events
+```
+
+
 ### Background
 
 Sending user-centric events to (_e.g._) Mixpanel is far from difficult; it's a single method call. However, in a
