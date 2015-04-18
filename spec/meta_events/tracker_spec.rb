@@ -503,7 +503,7 @@ EOS
     it "should include a distinct ID of nil if there is none" do
       i = new_instance(nil, nil, :definitions => definition_set, :version => 1)
       h = i.effective_properties(:foo, :bar)
-      expect(h.has_key?(:distinct_id)).to be_true
+      expect(h.has_key?(:distinct_id)).to be_truthy
       expect(h[:distinct_id]).to be_nil
     end
 
