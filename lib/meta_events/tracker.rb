@@ -157,7 +157,7 @@ module MetaEvents
   #       ...
   #       def to_event_properties
   #         {
-  #            :age => ((Time.now - date_of_birth) / 1.year).floor,
+  #            :age => ((Time.current - date_of_birth) / 1.year).floor,
   #            :payment_level => payment_level,
   #            :city => home_city
   #            ...
@@ -384,7 +384,7 @@ module MetaEvents
     # class.
     def event!(category_name, event_name, additional_properties = { })
       event_data = effective_properties(category_name, event_name, additional_properties)
-      event_data[:properties] = { 'time' => Time.now.to_i }.merge(event_data[:properties])
+      event_data[:properties] = { 'time' => Time.current.to_i }.merge(event_data[:properties])
 
       self.event_receivers.each do |receiver|
         receiver.track(event_data[:distinct_id], event_data[:external_name], event_data[:properties])
