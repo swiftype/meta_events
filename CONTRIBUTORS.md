@@ -21,6 +21,7 @@ Additional contributions by:
 * [Mark Quezada](https://github.com/markquezada): Submitting a pull request for issue where using `link_to` with a
   block would fail if you're using `meta_events`, due to the way Rails renames parameters in this scenario.
 * [Anthony](https://github.com/Aerlinger): Improved installation instructions.
+* [Cayo Medeiros](https://github.com/yogodoshi): Remove RSpec deprecation warnings.
 
 Inspiration for ideas by:
 
