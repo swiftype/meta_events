@@ -24,13 +24,6 @@ describe ::MetaEvents::Definition::Event do
     expect { klass.new(double("not-a-category"), :foo, "2014-01-01", "something") }.to raise_error(ArgumentError)
     expect { klass.new(category, nil, "2014-01-01", "something") }.to raise_error(ArgumentError)
     expect { klass.new(category, :foo, "2014-01-01", "something", :bonk => :baz) }.to raise_error(ArgumentError, /bonk/i)
-
-    # Ruby 1.8.x's Time.parse method will accept "foo" for Time.parse and just return Time.now --
-    # which is deeply unfortunate, but there's really no good way around it.
-    unless RUBY_VERSION =~ /^1\.8\./
-      expect { klass.new(category, :foo, "unparseable", "something") }.to raise_error(ArgumentError)
-      expect { klass.new(category, :foo, :desc => "something", :introduced => "unparseable") }.to raise_error(ArgumentError)
-    end
   end
 
   it "should fail if you don't set introduced or desc" do
@@ -120,13 +113,6 @@ describe ::MetaEvents::Definition::Event do
 
     it "should require valid data for #note" do
       expect { instance.note("", "me", "something here") }.to raise_error(ArgumentError)
-
-      # Ruby 1.8.x's Time.parse method will accept "foo" for Time.parse and just return Time.now --
-      # which is deeply unfortunate, but there's really no good way around it.
-      unless RUBY_VERSION =~ /^1\.8\./
-        expect { instance.note("foobar", "me", "something here") }.to raise_error(ArgumentError)
-      end
-
       expect { instance.note("2014-01-01", "", "something here") }.to raise_error(ArgumentError)
       expect { instance.note("2014-01-01", "me", "") }.to raise_error(ArgumentError)
     end

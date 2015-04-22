@@ -4,7 +4,7 @@ and a powerful properties system that makes it easy to pass large numbers of con
 
 MetaEvents supports:
 
-* Ruby 1.8.7, 1.9.3, 2.0.0, 2.1.2, or JRuby 1.7.12
+* 1.9.3, 2.0.0, 2.1.2, or JRuby 1.7.12
 
 These are, however, just the versions it's tested against; MetaEvents contains no code that should be at all
 particularly dependent on exact Ruby versions, and should be compatible with a broad set of versions.
