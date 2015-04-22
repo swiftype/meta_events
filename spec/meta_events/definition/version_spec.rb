@@ -51,7 +51,9 @@ describe ::MetaEvents::Definition::Version do
 
     it "should be able to create a new category, and retrieve it" do
       blk = lambda { :whatever }
-      expect(::MetaEvents::Definition::Category).to receive(:new).once.with(instance, ' FooBar ', :bar => :baz, &blk).and_return(category)
+      expect(::MetaEvents::Definition::Category).to receive(:new).once.with(instance, ' FooBar ', :bar => :baz) do |*args, &block|
+        expect(block).to eq(blk)
+      end.and_return(category)
       instance.category(' FooBar ', :bar => :baz, &blk)
 
       expect(instance.category_named(:quux)).to be(category)
