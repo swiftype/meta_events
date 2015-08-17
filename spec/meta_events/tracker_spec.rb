@@ -178,10 +178,10 @@ EOS
 
     describe "time support" do
       it "should add the time to the event" do
-        start_time = Time.now.to_i
+        start_time = Time.current.to_i
         i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
         i.event!(:foo, :bar, { })
-        end_time = Time.now.to_i
+        end_time = Time.current.to_i
         actual_properties = expect_event('xy1_foo_bar', { })
         time = actual_properties['time']
         expect(time).to be >= start_time
@@ -189,14 +189,14 @@ EOS
       end
 
       it "should allow overriding the time" do
-        actual_time = Time.now.to_i - 500
+        actual_time = Time.current.to_i - 500
         i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
         i.event!(:foo, :bar, { :time => actual_time })
         expect_event('xy1_foo_bar', { 'time' => actual_time })
       end
 
       it "should allow omitting the time" do
-        actual_time = Time.now.to_i - 500
+        actual_time = Time.current.to_i - 500
         i = new_instance(@distinct_id, nil, :definitions => definition_set, :version => 1)
         i.event!(:foo, :bar, { :time => nil })
         expect_event('xy1_foo_bar', { 'time' => nil })
