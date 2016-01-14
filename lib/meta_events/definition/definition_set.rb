@@ -15,6 +15,7 @@ module MetaEvents
     class DefinitionSet
       class BaseError < StandardError; end
       class RetiredEventError < BaseError; end
+      class RequiredPropertyMissingError < BaseError; end
 
       class << self
         # Creates an MetaEvents::Definition::DefinitionSet. +source+ can be one of:

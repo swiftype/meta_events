@@ -73,8 +73,10 @@ module MetaEvents
       # provide for required properties, property validation, or anything else.
       def validate!(properties)
         if retired_at
-          raise ::MetaEvents::Definition::DefinitionSet::RetiredEventError, "Event #{full_name} was retired at #{retired_at.inspect} (or its category or version was); you can't use it any longer."
+          raise ::MetaEvents::Definition::DefinitionSet::RetiredEventError,
+            "Event #{full_name} was retired at #{retired_at.inspect} (or its category or version was); you can't use it any longer."
         end
+        validate_properties!(properties)
       end
 
       # Returns, or sets, the description for an event.
@@ -142,10 +144,26 @@ module MetaEvents
         raise ArgumentError, "You must record when you introduced event #{full_name}, either as an argument, in the options, or using 'introduced'" if (! @introduced)
       end
 
+      def validate_properties!(properties)
+        properties_with_indifferent_access = properties.with_indifferent_access
+        if @required_properties
+          missing_properties = [ ]
+          @required_properties.each do |required_property|
+            if properties_with_indifferent_access[required_property].blank?
+              missing_properties << required_property
+            end
+          end
+          unless missing_properties.empty?
+            raise ::MetaEvents::Definition::DefinitionSet::RequiredPropertyMissingError,
+              "Event #{full_name} requires the properties #{@required_properties.join(', ')}. #{missing_properties.join(', ')} were missing or had blank values."
+          end
+        end
+      end
+
       # Called with the set of options (which can be empty) supplied in the constructor; responsible for applying those
       # to the object properly.
       def apply_options!(options)
-        options.assert_valid_keys(:introduced, :desc, :description, :retired_at, :external_name)
+        options.assert_valid_keys(:introduced, :desc, :description, :retired_at, :external_name, :required_properties)
 
         introduced options[:introduced] if options[:introduced]
         desc options[:desc] if options[:desc]
@@ -153,6 +171,7 @@ module MetaEvents
         external_name options[:external_name] if options[:external_name]
 
         @retired_at = Time.parse(options[:retired_at]) if options[:retired_at]
+        @required_properties = Array(options[:required_properties]) if options[:required_properties]
       end
 
       # Called with the arguments (past the category and event name) supplied to the constructor; responsible for
