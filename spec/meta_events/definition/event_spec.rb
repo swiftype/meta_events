@@ -66,6 +66,14 @@ describe ::MetaEvents::Definition::Event do
         allow(category).to receive(:retired_at).and_return(Time.parse("2013-02-01"))
         expect { instance.validate!(:foo => :bar) }.to raise_error(::MetaEvents::Definition::DefinitionSet::RetiredEventError, /2013/)
       end
+
+      it "should fail if required properties are missing" do
+        expect { klass.new(category, :foo, "2016-1-1", "foobar", :required_properties => [ :foo ]).validate!(:baz => :bar) }.to raise_error(::MetaEvents::Definition::DefinitionSet::RequiredPropertyMissingError, /foo/)
+      end
+
+      it "should fail if required properties have blank values" do
+        expect { klass.new(category, :foo, "2016-1-1", "foobar", :required_properties => [ :foo ]).validate!(:foo => '') }.to raise_error(::MetaEvents::Definition::DefinitionSet::RequiredPropertyMissingError, /foo/)
+      end
     end
 
     it "should return and allow setting its description via #desc" do
@@ -141,6 +149,16 @@ describe ::MetaEvents::Definition::Event do
         expect(instance.external_name).to eq("custom external name")
         instance.external_name "my name"
         expect(instance.external_name).to eq("my name")
+      end
+    end
+
+    context "with required properties" do
+      it "should work with strings and symbols" do
+        expect do
+          event = klass.new(category, :foo, "2016-1-1", "foobar", :required_properties => [ "string", :symbol ])
+          event.validate!('string' => "foo", :symbol => "foo")
+          event.validate!(:string => "foo", "symbol" => "foo")
+        end.to_not raise_error(::MetaEvents::Definition::DefinitionSet::RequiredPropertyMissingError)
       end
     end
   end

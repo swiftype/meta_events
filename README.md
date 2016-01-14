@@ -629,6 +629,25 @@ purposes; the exception is generated if `:retired_at` is set to _anything_.)
 You can retire events, categories, and entire versions; this system ensures the DSL continues to be a historical record
 of what things were in the past, as well as what they are today.
 
+### Requiring Properties
+
+Sometimes it is helpful to enforce the presence of certain properties. For example, imagine you are tracking views of
+a set of banners that advertise a set of new features. In order to determine which banners (and therefore features) are
+driving conversions, you need to be sure to include `:banner_id` and `:banner_size`. If there are many places in the
+code that can call this event, you may forget to pass along these properties. With `:required_properties` an exception
+is generated if the keys are not present _or if their values are blank_.
+
+```ruby
+global_events_prefix :ab
+
+version 1, "2014-02-04" do
+  category :user do
+    event :viewed_banner, "2014-02-04", "user creates a brand-new account", :required_properties => [ :banner_id, :banner_size ]
+  end
+end
+```
+
+
 ### Adding Notes to Events
 
 You can also add notes to events. They must be tagged with the author and the time, and they can be very useful for
