@@ -532,6 +532,7 @@ module MetaEvents
         when String then value.strip
         when Symbol then value.to_s.strip
         when Time then value.getutc.strftime("%Y-%m-%dT%H:%M:%S")
+        when IPAddr then value.to_s
         when FLOAT_INFINITY then "+infinity"
         when -FLOAT_INFINITY then "-infinity"
         when Array then
