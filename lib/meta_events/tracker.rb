@@ -528,12 +528,12 @@ module MetaEvents
         case value
         when true, false, nil then value
         when ActiveSupport::Duration then value.to_i
-        when FLOAT_INFINITY then "+infinity"
-        when -FLOAT_INFINITY then "-infinity"
         when Numeric then value
         when String then value.strip
         when Symbol then value.to_s.strip
         when Time then value.getutc.strftime("%Y-%m-%dT%H:%M:%S")
+        when FLOAT_INFINITY then "+infinity"
+        when -FLOAT_INFINITY then "-infinity"
         when Array then
           out = value.map { |e| normalize_scalar_property_value(e) }
           out = :invalid_property_value if out.detect { |e| e == :invalid_property_value }
