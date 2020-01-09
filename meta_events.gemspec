@@ -6,11 +6,15 @@ require 'meta_events/version'
 Gem::Specification.new do |spec|
   spec.name          = "meta_events"
   spec.version       = MetaEvents::VERSION
-  spec.authors       = ["Andrew Geweke"]
-  spec.email         = ["ageweke@swiftype.com"]
+  spec.authors       = ["Andrew Geweke", "Caleb Buxton"]
+  spec.email         = ["ageweke@swiftype.com", "caleb+meta_events@kinside.com"]
   spec.summary       = %q{Structured, documented, powerful event emitting library for Mixpanel and other such systems.}
-  spec.homepage      = "http://www.github.com/swiftype/meta_events"
+  spec.homepage      = "https://www.github.com/trykinside/meta_events"
   spec.license       = "MIT"
+
+  if spec.respond_to?(:metadata)
+    spec.metadata["allowed_push_host"] = "https://rubygems.pkg.github.com/trykinside"
+  end
 
   spec.files         = `git ls-files -z`.split("\x0")
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
